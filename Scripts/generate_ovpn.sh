@@ -23,14 +23,6 @@ backup_file() {
     fi
 }
 
-# Remove EASYRSA_REQ_CN variable to avoid conflict
-VARS_FILE="/root/work/openvpn-ca/vars"
-if grep -q "EASYRSA_REQ_CN" "$VARS_FILE"; then
-    echo "Removing EASYRSA_REQ_CN variable to avoid conflict..."
-    sed -i '/EASYRSA_REQ_CN/d' "$VARS_FILE"
-    echo "EASYRSA_REQ_CN variable removed."
-fi
-
 # Define the main configuration files of our OpenVPN server
 CONFIG_DIR="/root/client-configs"
 CCD_DIR="/etc/openvpn/ccd"
@@ -64,9 +56,9 @@ if [ -f "$CLIENT_CERT" ] || [ -f "$CLIENT_KEY" ]; then
         backup_file "$CLIENT_CERT" "$BACKUP_DIR"
         rm -f "$CLIENT_CERT"
 
-        # Generate a new certificate
+        # Generate a new certificate with automatic confirmation
         cd /root/work/openvpn-ca || exit
-        ./easyrsa build-client-full "$CLIENT_NAME" nopass
+        ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass
 
         echo -e "\e[32mBackup of removed files you can find here: $BACKUP_DIR\e[0m"
     else
@@ -77,7 +69,7 @@ else
     # Generate a new certificate if it doesn't exist
     echo "Generating a new certificate for the client $CLIENT_NAME..."
     cd /root/work/openvpn-ca || exit
-    ./easyrsa build-client-full "$CLIENT_NAME" nopass
+    ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass
 fi
 
 # Check if the certificate has been created successfully
