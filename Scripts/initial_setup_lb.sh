@@ -446,7 +446,7 @@ ufw allow from 172.21.0.0/24 to any port 7856 > /dev/null 2>&1
 ufw allow 3194/tcp > /dev/null 2>&1
 ufw allow 443 > /dev/null 2>&1
 ufw deny 22 > /dev/null 2>&1
-output_status "Allow inbound connections for 443, 3194 (UDP), and 7856 ports" "Done" "$GREEN"
+output_status "Allow inbound connections for 443, 3194 (TCP), and 7856 ports" "Done" "$GREEN"
 
 # Disable ssh.socket and restart SSH and UFW
 output_status "Disabling ssh.socket and restarting SSH and UFW..." "In Progress" "$GREEN"
