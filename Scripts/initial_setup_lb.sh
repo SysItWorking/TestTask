@@ -78,6 +78,30 @@ chmod 600 "$AUTH_KEYS_FILE"                         # Set correct permissions
 chown deploy:deploy "$AUTH_KEYS_FILE"               # Set correct ownership
 output_status "Set correct permissions and ownership for authorized_keys" "Done" "$GREEN"
 
+# Check if SSH keys already exist for the deploy user
+SSH_PRIVATE_KEY="/home/deploy/.ssh/id_rsa"
+SSH_PUBLIC_KEY="/home/deploy/.ssh/id_rsa.pub"
+
+output_status "Checking if SSH keys for deploy user already exist..." "In Progress" "$GREEN"
+
+if [ -f "$SSH_PRIVATE_KEY" ] && [ -f "$SSH_PUBLIC_KEY" ]; then
+    output_status "SSH keys already exist for deploy user, skipping creation" "Skipped" "$YELLOW"
+else
+    output_status "Generating SSH keys for deploy user" "In Progress" "$GREEN"
+    su - deploy -c "ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N '' -q"  # Create keys without passphrase in quiet mode
+    if [ $? -eq 0 ]; then
+        output_status "SSH keys generated for deploy user" "Done" "$GREEN"
+    else
+        output_status "Failed to generate SSH keys for deploy user" "Failed" "$RED"
+        exit 1
+    fi
+fi
+
+# Set the correct permissions for the SSH keys
+chmod 600 "$SSH_PRIVATE_KEY" "$SSH_PUBLIC_KEY"
+chown deploy:deploy "$SSH_PRIVATE_KEY" "$SSH_PUBLIC_KEY"
+output_status "Set correct permissions for SSH keys" "Done" "$GREEN"
+
 # Update system packages
 output_status "Updating system packages" "In Progress" "$GREEN"
 
