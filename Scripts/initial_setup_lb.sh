@@ -210,7 +210,7 @@ if [ -f "$HMAC_FILE" ]; then
     output_status "HMAC file already exists, skipping creation" "Skipped" "$YELLOW"
 else
     output_status "Creating HMAC for DoS protection" "In Progress" "$GREEN"
-    if openvpn --genkey --secret "$HMAC_FILE"; then
+    if openvpn --genkey secret "$HMAC_FILE"; then  # исправленная команда
         output_status "HMAC created" "Done" "$GREEN"
     else
         output_status "Failed to create HMAC" "Failed" "$RED"
