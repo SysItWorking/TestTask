@@ -253,7 +253,7 @@ fi
 output_status "Creating OpenVPN server configuration file" "In Progress" "$GREEN"
 cat <<EOF > /etc/openvpn/server.conf
 port 3194
-proto udp
+proto tcp
 dev tun
 topology subnet
 client-to-client
@@ -360,7 +360,7 @@ mkdir -p "$CONFIG_DIR"
 cat <<EOF > "$OUTPUT_FILE"
 client
 dev tun
-proto udp
+proto tcp
 remote $MAIN_IP 3194
 resolv-retry infinite
 nobind
