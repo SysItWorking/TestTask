@@ -428,10 +428,10 @@ else
     output_status "SSH port is already set to 7856" "Skipped" "$YELLOW"
 fi
 
-# Check and add SSH access restriction for 172.21.0.0/24
+# Check and add SSH access restriction for 172.21.0.0/24 and 185.247.20.223/32
 if ! grep -q "^Match Address 172.21.0.0/24,185.247.20.223/32" /etc/ssh/sshd_config; then
-    output_status "Adding SSH access restriction for subnet 172.21.0.0/24,185.247.20.223/32" "In Progress" "$GREEN"
-    echo "Match Address 172.21.0.0/24" >> /etc/ssh/sshd_config
+    output_status "Adding SSH access restriction for subnets 172.21.0.0/24 and 185.247.20.223/32" "In Progress" "$GREEN"
+    echo "Match Address 172.21.0.0/24,185.247.20.223/32" >> /etc/ssh/sshd_config
     echo "    PermitRootLogin no" >> /etc/ssh/sshd_config
     echo "    PasswordAuthentication no" >> /etc/ssh/sshd_config
     echo "    AllowUsers deploy" >> /etc/ssh/sshd_config
