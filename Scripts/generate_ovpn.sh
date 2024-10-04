@@ -23,6 +23,16 @@ backup_file() {
     fi
 }
 
+# Add EASYRSA_REQ_CN for server certificates
+add_easyrsa_req_cn() {
+    echo "export EASYRSA_REQ_CN=\"TestTask Server CA\"" >> /root/work/openvpn-ca/vars
+}
+
+# Remove EASYRSA_REQ_CN for client certificates
+remove_easyrsa_req_cn() {
+    sed -i '/EASYRSA_REQ_CN/d' /root/work/openvpn-ca/vars
+}
+
 # Define the main configuration files of our OpenVPN server
 CONFIG_DIR="/root/client-configs"
 CCD_DIR="/etc/openvpn/ccd"
@@ -41,6 +51,9 @@ CCD_FILE="$CCD_DIR/$CLIENT_NAME"
 REQ_FILE="/root/work/openvpn-ca/pki/reqs/$CLIENT_NAME.req"
 BACKUP_DIR="/root/work/openvpn-ca/backups/$CLIENT_NAME/$(date +'%Y%m%d_%H%M%S')"
 
+# Remove EASYRSA_REQ_CN for client certificates
+remove_easyrsa_req_cn
+
 # Check if the certificate with the same name is already present in the system
 if [ -f "$CLIENT_CERT" ] || [ -f "$CLIENT_KEY" ]; then
     if confirm "Certificate already exists for $CLIENT_NAME. Do you want to regenerate it?"; then
@@ -58,7 +71,7 @@ if [ -f "$CLIENT_CERT" ] || [ -f "$CLIENT_KEY" ]; then
 
         # Generate a new certificate with automatic confirmation
         cd /root/work/openvpn-ca || exit
-        yes yes | ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass > /dev/null 2>&1
+        ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass > /dev/null 2>&1
 
         if [ -f "$CLIENT_CERT" ] && [ -f "$CLIENT_KEY" ]; then
             echo -e "\e[32mClient certificate regenerated for $CLIENT_NAME. Backup of removed files is located here: $BACKUP_DIR\e[0m"
@@ -74,7 +87,7 @@ else
     # Generate a new certificate if it doesn't exist
     echo "Generating a new certificate for the client $CLIENT_NAME..."
     cd /root/work/openvpn-ca || exit
-    yes yes | ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass > /dev/null 2>&1
+    ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass > /dev/null 2>&1
 
     if [ -f "$CLIENT_CERT" ] && [ -f "$CLIENT_KEY" ]; then
         echo -e "\e[32mClient certificate generated for $CLIENT_NAME\e[0m"
