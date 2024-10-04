@@ -6,16 +6,18 @@ GREEN=$(tput setaf 2)
 RED=$(tput setaf 1)
 RESET=$(tput sgr0)
 
-# Function for formatted output
+# Calculate padding to align statuses
 output_status() {
     local message=$1
     local status=$2
     local color=$3
+    local total_width=85  # Total width for the message + status
+    local message_length=${#message}  # Calculate the length of the message
+    local padding=$((total_width - message_length))  # Calculate how many spaces to add
 
-    # Output the message and the status, right-aligned
-    printf "%-80s [%b%s%b]\n" "$message" "$color" "$status" "$RESET"
+    # Output the message, padded with spaces, and then the status
+    printf "%s%*s [%b%s%b]\n" "$message" "$padding" "" "$color" "$status" "$RESET"
 }
-
 # Set HostName and log the result
 output_status "Setting hostname to 'load-balancing'" "In Progress" "$GREEN"
 if hostnamectl set-hostname load-balancing; then
