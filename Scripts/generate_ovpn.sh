@@ -128,7 +128,7 @@ echo "Generating configuration file for client $CLIENT_NAME..."
 cat <<EOF > "$OUTPUT_FILE"
 client
 dev tun
-proto udp
+proto tcp
 remote $MAIN_IP 3194
 resolv-retry infinite
 nobind
