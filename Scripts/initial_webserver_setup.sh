@@ -63,15 +63,16 @@ apt update &>/dev/null
 apt install ufw net-tools -y &>/dev/null
 
 # Configuring SSH
-sed -i 's/^#Port 22/Port 7856/' /etc/ssh/sshd_config && echo "AllowUsers deploy@172.21.0.0/24" >> /etc/ssh/sshd_config
-ufw allow from 172.21.0.0/24 to any port 7856
+sed -i 's/^#Port 22/Port 7856/' /etc/ssh/sshd_config && echo "AllowUsers deploy@172.21.0.0/24 deploy@185.247.20.223/32" >> /etc/ssh/sshd_config
+ufw allow from 172.21.0.0/24 to any port 7856 > /dev/null 2>&1
+ufw allow from 185.247.20.223/32 to any port 7856 > /dev/null 2>&1
 ufw deny 22
 
 # Restarting SSH and enabling UFW
 systemctl stop ssh.socket
 systemctl disable ssh.socket
 systemctl restart ssh
-ufw enable
+ufw --force enable > /dev/null 2>&1
 
 if [ $? -eq 0 ]; then
     print_color "Firewall and SSH settings configured successfully" "green"
