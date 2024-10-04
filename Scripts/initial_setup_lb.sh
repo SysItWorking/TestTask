@@ -13,7 +13,7 @@ output_status() {
     local color=$3
 
     # Output the message and the status, right-aligned
-    printf "%-65s [%b%s%b]\n" "$message" "$color" "$status" "$RESET"
+    printf "%-70s [%b%s%b]\n" "$message" "$color" "$status" "$RESET"
 }
 
 # Set HostName and log the result
