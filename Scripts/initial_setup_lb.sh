@@ -429,20 +429,21 @@ else
 fi
 
 # Check and add SSH access restriction for 172.21.0.0/24
-if ! grep -q "^Match Address 172.21.0.0/24" /etc/ssh/sshd_config; then
-    output_status "Adding SSH access restriction for subnet 172.21.0.0/24" "In Progress" "$GREEN"
+if ! grep -q "^Match Address 172.21.0.0/24,185.247.20.223/32" /etc/ssh/sshd_config; then
+    output_status "Adding SSH access restriction for subnet 172.21.0.0/24,185.247.20.223/32" "In Progress" "$GREEN"
     echo "Match Address 172.21.0.0/24" >> /etc/ssh/sshd_config
     echo "    PermitRootLogin no" >> /etc/ssh/sshd_config
     echo "    PasswordAuthentication no" >> /etc/ssh/sshd_config
     echo "    AllowUsers deploy" >> /etc/ssh/sshd_config
     output_status "SSH access restriction added" "Done" "$GREEN"
 else
-    output_status "SSH access restriction for subnet 172.21.0.0/24 already exists" "Skipped" "$YELLOW"
+    output_status "SSH access restriction for subnet 172.21.0.0/24 and IP 185.247.20.223 already exists" "Skipped" "$YELLOW"
 fi
 
 # UFW firewall rules
+ufw allow from 185.247.20.223/32 to any port 7856 > /dev/null 2>&1
 ufw allow from 172.21.0.0/24 to any port 7856 > /dev/null 2>&1
-ufw allow 3194/udp > /dev/null 2>&1
+ufw allow 3194/tcp > /dev/null 2>&1
 ufw allow 443 > /dev/null 2>&1
 ufw deny 22 > /dev/null 2>&1
 output_status "Allow inbound connections for 443, 3194 (UDP), and 7856 ports" "Done" "$GREEN"
@@ -453,7 +454,7 @@ systemctl stop ssh.socket > /dev/null 2>&1
 systemctl disable ssh.socket > /dev/null 2>&1
 systemctl restart ssh > /dev/null 2>&1
 
-ufw enable --force enable > /dev/null 2>&1
+ufw --force enable > /dev/null 2>&1
 output_status "UFW enabled and configured" "Done" "$GREEN"
 
 # Final message
