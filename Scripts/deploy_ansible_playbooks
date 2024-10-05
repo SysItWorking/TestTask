@@ -105,10 +105,9 @@ EOL
     fi
 }
 
-###########################################################################
-# Step 5: Create directory structure to deploy and configure Apache, PHP, #
-# user management, virtual hosts, MariaDB, firewall, and templates        #
-###########################################################################
+#########################################################################
+# Step 5: Create directory structure to deploy and configure roles      #
+#########################################################################
 
 create_directory_structure() {
     # Define an array of directories to create
@@ -138,22 +137,19 @@ create_directory_structure() {
     local all_created=true  # Flag to track if all directories were created successfully
     
     for dir in "${directories[@]}"; do
-        if [ -d "$dir" ]; then
-            # Directory already exists
-            output_status "Create directory $dir" "Already exists" "$YELLOW"
-        else
-            # Try to create the directory
-            if mkdir -p "$dir"; then
-                output_status "Create directory $dir" "Done" "$GREEN"
-            else
-                output_status "Create directory $dir" "error" "$RED"
+        # Create directory if it does not exist
+        if [ ! -d "$dir" ]; then
+            if ! mkdir -p "$dir"; then
                 all_created=false
             fi
         fi
     done
     
-    # If any directory failed to create, exit with an error code
-    if [ "$all_created" = false ]; then
+    # Output single status message based on the result of all directory creations
+    if [ "$all_created" = true ]; then
+        output_status "Create directory structure" "Done" "$GREEN"
+    else
+        output_status "Create directory structure" "error" "$RED"
         exit 1
     fi
 }
