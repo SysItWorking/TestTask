@@ -119,19 +119,18 @@ create_directory_structure() {
         "/etc/ansible/roles/php_install/tasks"
         "/etc/ansible/roles/php_install/handlers"
         "/etc/ansible/roles/php_install/defaults"
+        "/etc/ansible/roles/php_install/templates"
         "/etc/ansible/roles/user_management/tasks"
         "/etc/ansible/roles/user_management/defaults"
         "/etc/ansible/roles/vhost_configuration/tasks"
-        "/etc/ansible/roles/vhost_configuration/defaults"
+        "/etc/ansible/roles/vhost_configuration/templates"
         "/etc/ansible/roles/mariadb_install/tasks"
         "/etc/ansible/roles/mariadb_install/handlers"
         "/etc/ansible/roles/mariadb_install/templates"
-        "/etc/ansible/roles/mariadb_install/defaults"
-        "/etc/ansible/roles/mariadb_install/vars"
         "/etc/ansible/roles/firewall/tasks"
         "/etc/ansible/roles/firewall/defaults"
-        "/etc/ansible/templates"
         "/etc/ansible/roles/hosts_management/tasks"
+        "/etc/ansible/roles/mariadb_install/vars"
     )
 
     local all_created=true  # Flag to track overall success
@@ -160,9 +159,922 @@ create_directory_structure() {
     fi
 }
 
+#########################################################################
+# Step 6: Create file which will contain variables for Apache role      #
+#########################################################################
+
+create_apache_variables_file() {
+    local apache_vars_file="/etc/ansible/roles/apache_install/defaults/main.yml"
+    
+    if [ -f "$apache_vars_file" ]; then
+        # File already exists
+        output_status "Create the Apache variables file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/apache_install/defaults && cat <<EOL > "$apache_vars_file"
+server_name: testtask.com
+doc_root: "/var/www/{{ user }}/public_html"
+log_dir: "/var/www/{{ user }}/logs"
+cgi_dir: "/var/www/{{ user }}/cgi-bin"
+apache_suexec_package: "apache2-suexec-pristine"
+apache_sites_available: "/etc/apache2/sites-available"
+apache_sites_enabled: "/etc/apache2/sites-enabled"
+apache_configtest_cmd: "apachectl configtest"
+EOL
+        then
+            output_status "Create the Apache variables file" "Done" "$GREEN"
+        else
+            output_status "Create the Apache variables file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 7: Create tasks file to install and configure Apache Server      #
+#########################################################################
+
+create_apache_tasks_file() {
+    local apache_tasks_file="/etc/ansible/roles/apache_install/tasks/main.yml"
+    
+    if [ -f "$apache_tasks_file" ]; then
+        # File already exists
+        output_status "Create the Apache tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/apache_install/tasks && cat <<EOL > "$apache_tasks_file"
+---
+- name: Install Apache web server
+  apt:
+    name: apache2
+    state: present
+    update_cache: yes
+  register: apache_install  # Register the result of the task
+
+- name: Print message if Apache was already installed
+  debug:
+    msg: "Apache is already installed."
+  when: apache_install.changed == false  # Output message if no changes
+
+- name: Install Apache suexec module (pristine version)
+  apt:
+    name: "{{ apache_suexec_package }}"
+    state: present
+    update_cache: yes
+
+- name: Enable Apache mod_rewrite
+  apache2_module:
+    name: rewrite
+    state: present
+  notify: check_apache_config
+
+- name: Enable Apache mod_suexec
+  apache2_module:
+    name: suexec
+    state: present
+  notify: check_apache_config
+
+- name: Disable default Apache site
+  command: a2dissite 000-default.conf
+  notify: check_apache_config
+
+# Added task to check Apache service status before triggering handlers
+- name: Check Apache service status
+  service:
+    name: apache2
+    state: started
+  register: apache_status
+EOL
+        then
+            output_status "Create the Apache tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the Apache tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 8: Create handlers file to manage Apache configuration           #
+#########################################################################
+
+create_apache_handlers_file() {
+    local apache_handlers_file="/etc/ansible/roles/apache_install/handlers/main.yml"
+    
+    if [ -f "$apache_handlers_file" ]; then
+        # File already exists
+        output_status "Create the Apache handlers file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/apache_install/handlers && cat <<EOL > "$apache_handlers_file"
+---
+# Handler to check Apache configuration
+- name: check_apache_config
+  command: apachectl configtest
+  notify:
+    - restart_apache
+
+# Handler for restarting Apache service if it is running
+- name: restart_apache
+  service:
+    name: apache2
+    state: restarted
+  when: apache_status.state == "started"
+
+# Fallback: start Apache if it is not running
+- name: start_apache_if_not_running
+  service:
+    name: apache2
+    state: started
+  when: apache_status.state != "started"
+EOL
+        then
+            output_status "Create the Apache handlers file" "Done" "$GREEN"
+        else
+            output_status "Create the Apache handlers file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 9: Create variables file for PHP Install role                    #
+#########################################################################
+
+create_php_variables_file() {
+    local php_vars_file="/etc/ansible/roles/php_install/defaults/main.yml"
+    
+    if [ -f "$php_vars_file" ]; then
+        # File already exists
+        output_status "Create the PHP variables file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/php_install/defaults && cat <<EOL > "$php_vars_file"
+php_version: "8.3"
+php_fpm_pool_dir: "/etc/php/{{ php_version }}/fpm/pool.d"
+php_fpm_sock_dir: "/run/php"
+EOL
+        then
+            output_status "Create the PHP variables file" "Done" "$GREEN"
+        else
+            output_status "Create the PHP variables file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 10: Create tasks file for PHP 8.3 installation                   #
+#########################################################################
+
+create_php_tasks_file() {
+    local php_tasks_file="/etc/ansible/roles/php_install/tasks/main.yml"
+    
+    if [ -f "$php_tasks_file" ]; then
+        # File already exists
+        output_status "Create the PHP tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/php_install/tasks && cat <<EOL > "$php_tasks_file"
+---
+# /etc/ansible/roles/php_install/tasks/main.yml
+
+# Install gnupg and lsb-release for repository management
+- name: Install gnupg and lsb-release
+  apt:
+    name:
+      - gnupg
+      - lsb-release
+    state: present
+    update_cache: yes
+
+# Import GPG key for Sury repository
+- name: Import Sury GPG key
+  apt_key:
+    url: https://packages.sury.org/php/apt.gpg
+    state: present
+
+# Get distribution codename (e.g., bookworm, bullseye)
+- name: Get distribution codename
+  command: lsb_release -sc
+  register: dist_codename
+
+# Add Sury PHP repository for Debian with dynamic codename
+- name: Add Sury PHP repository for Debian
+  apt_repository:
+    repo: "deb https://packages.sury.org/php/ {{ dist_codename.stdout }} main"
+    state: present
+    filename: "/etc/apt/sources.list.d/php.list"
+
+# Update apt cache after adding the repository
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+# Install PHP 8.3 and PHP-FPM
+- name: Install PHP 8.3 and PHP-FPM
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - php8.3
+    - php8.3-fpm
+    - php8.3-mysql
+    - php8.3-cli
+    - php8.3-curl
+    - php8.3-gd
+    - php8.3-xml
+    - php8.3-mbstring
+    - php8.3-zip
+    - php8.3-soap
+    - php8.3-intl
+  notify: restart_php_fpm
+
+# Configure PHP-FPM pool for 'web' user
+- name: Configure PHP-FPM pool for 'web'
+  template:
+    src: /etc/ansible/templates/php-fpm-pool.j2
+    dest: "{{ php_fpm_pool_dir }}/{{ user }}.conf"
+  notify: restart_php_fpm
+
+# Get PHP-FPM service status
+- name: Get PHP-FPM service status
+  ansible.builtin.systemd:
+    name: php8.3-fpm
+    state: started
+  register: php_fpm_status
+EOL
+        then
+            output_status "Create the PHP tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the PHP tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 11: Create PHP-FPM pool configuration template                   #
+#########################################################################
+
+create_php_fpm_template() {
+    local php_fpm_template="/etc/ansible/roles/php_install/templates/php-fpm-pool.j2"
+    
+    if [ -f "$php_fpm_template" ]; then
+        # File already exists
+        output_status "Create the PHP-FPM pool configuration template" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/php_install/templates && cat <<EOL > "$php_fpm_template"
+[{{ user }}]
+user = {{ user }}
+group = {{ group }}
+listen = "{{ php_fpm_sock_dir }}/php{{ php_version }}-fpm-{{ user }}.sock"
+listen.owner = {{ user }}
+listen.group = {{ group }}
+listen.mode = 0660
+
+pm = dynamic
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+pm.max_requests = 500
+
+php_admin_value[open_basedir] = /var/www/{{ user }}/public_html:/usr/share/php:/tmp
+php_admin_value[upload_tmp_dir] = /var/www/{{ user }}/tmp
+php_admin_value[session.save_path] = /var/www/{{ user }}/tmp
+EOL
+        then
+            output_status "Create the PHP-FPM pool configuration template" "Done" "$GREEN"
+        else
+            output_status "Create the PHP-FPM pool configuration template" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 12: Create handlers file for PHP-FPM management                  #
+#########################################################################
+
+create_php_fpm_handlers_file() {
+    local php_fpm_handlers_file="/etc/ansible/roles/php_install/handlers/main.yml"
+    
+    if [ -f "$php_fpm_handlers_file" ]; then
+        # File already exists
+        output_status "Create the PHP-FPM handlers file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/php_install/handlers && cat <<EOL > "$php_fpm_handlers_file"
+---
+# Перезапуск PHP-FPM, если он уже запущен
+- name: restart_php_fpm
+  ansible.builtin.systemd:
+    name: php8.3-fpm
+    state: restarted
+  when: "'php8.3-fpm' in ansible_facts.services and ansible_facts.services['php8.3-fpm'].state == 'running'"
+
+# Запуск PHP-FPM, если он не был запущен
+- name: start_php_fpm_if_not_running
+  ansible.builtin.systemd:
+    name: php8.3-fpm
+    state: started
+  when: "'php8.3-fpm' in ansible_facts.services and ansible_facts.services['php8.3-fpm'].state != 'running'"
+EOL
+        then
+            output_status "Create the PHP-FPM handlers file" "Done" "$GREEN"
+        else
+            output_status "Create the PHP-FPM handlers file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 13: Create variables file for User Management role               #
+#########################################################################
+
+create_user_management_variables_file() {
+    local user_management_vars_file="/etc/ansible/roles/user_management/defaults/main.yml"
+    
+    if [ -f "$user_management_vars_file" ]; then
+        # File already exists
+        output_status "Create the User Management variables file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/user_management/defaults && cat <<EOL > "$user_management_vars_file"
+user: "web"
+group: "web"
+doc_root: "/var/www/{{ user }}/public_html"
+log_dir: "/var/www/{{ user }}/logs"
+cgi_dir: "/var/www/{{ user }}/cgi-bin"
+EOL
+        then
+            output_status "Create the User Management variables file" "Done" "$GREEN"
+        else
+            output_status "Create the User Management variables file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 14: Create tasks file for User Management role                   #
+#########################################################################
+
+create_user_management_tasks_file() {
+    local user_management_tasks_file="/etc/ansible/roles/user_management/tasks/main.yml"
+    
+    if [ -f "$user_management_tasks_file" ]; then
+        # File already exists
+        output_status "Create the User Management tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/user_management/tasks && cat <<EOL > "$user_management_tasks_file"
+---
+- name: Create groups
+  group:
+    name: "{{ item.group }}"
+  with_items:
+    - { name: "web", group: "web" }
+
+- name: Create users
+  user:
+    name: "{{ item.name }}"
+    group: "{{ item.group }}"
+    home: "/var/www/{{ item.name }}"
+    createhome: yes
+    shell: /bin/bash
+  with_items:
+    - { name: "web", group: "web" }
+
+- name: Set permissions for the web directory
+  file:
+    path: "/var/www/{{ item.name }}/public_html"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.group }}"
+    mode: '0755'
+  with_items:
+    - { name: "web", group: "web" }
+
+- name: Create logs directory for the site
+  file:
+    path: "/var/www/{{ item.name }}/logs"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.group }}"
+    mode: '0755'
+  with_items:
+    - { name: "web", group: "web" }
+
+- name: Create cgi-bin directory for the site
+  file:
+    path: "/var/www/{{ item.name }}/cgi-bin"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.group }}"
+    mode: '0755'
+  with_items:
+    - { name: "web", group: "web" }
+EOL
+        then
+            output_status "Create the User Management tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the User Management tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 15: Create tasks file for setting up virtual hosts               #
+#########################################################################
+
+create_vhost_tasks_file() {
+    local vhost_tasks_file="/etc/ansible/roles/vhost_configuration/tasks/main.yml"
+    
+    if [ -f "$vhost_tasks_file" ]; then
+        # File already exists
+        output_status "Create the Virtual Host tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/vhost_configuration/tasks && cat <<EOL > "$vhost_tasks_file"
+---
+- name: Configure virtual host
+  template:
+    src: /etc/ansible/roles/vhost_configuration/templates/vhost.j2
+    dest: "{{ apache_sites_available }}/{{ server_name }}.conf"
+  notify: check_apache_config
+
+- name: Enable the site
+  command: a2ensite {{ server_name }}.conf
+  notify: check_apache_config
+EOL
+        then
+            output_status "Create the Virtual Host tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the Virtual Host tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 16: Create template for virtual host                             #
+#########################################################################
+
+create_vhost_template() {
+    local vhost_template="/etc/ansible/roles/vhost_configuration/templates/vhost.j2"
+    
+    if [ -f "$vhost_template" ]; then
+        # File already exists
+        output_status "Create the Virtual Host template" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/vhost_configuration/templates && cat <<EOL > "$vhost_template"
+<VirtualHost *:80>
+    DocumentRoot "{{ doc_root }}"
+    ServerName {{ server_name }}
+    ServerAlias www.{{ server_name }}
+    ErrorLog "{{ log_dir }}/error.log"
+    CustomLog "{{ log_dir }}/access.log" common
+
+    <Directory "{{ doc_root }}">
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php{{ php_version }}-fpm.sock|fcgi://localhost/"
+    </FilesMatch>
+
+    # Support for cgi-bin, if needed for non-PHP scripts
+    ScriptAlias /cgi-bin/ "{{ cgi_dir }}"
+    <Directory "{{ cgi_dir }}">
+        AllowOverride None
+        Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+        Require all granted
+    </Directory>
+</VirtualHost>
+EOL
+        then
+            output_status "Create the Virtual Host template" "Done" "$GREEN"
+        else
+            output_status "Create the Virtual Host template" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 17: Create tasks file for MariaDB installation and replication   #
+#########################################################################
+
+create_mariadb_tasks_file() {
+    local mariadb_tasks_file="/etc/ansible/roles/mariadb_install/tasks/main.yml"
+    
+    if [ -f "$mariadb_tasks_file" ]; then
+        # File already exists
+        output_status "Create the MariaDB tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/mariadb_install/tasks && cat <<EOL > "$mariadb_tasks_file"
+---
+- name: Ensure MariaDB is installed
+  apt:
+    name: mariadb-server
+    state: present
+    update_cache: yes
+
+- name: Ensure MariaDB is started and running
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+
+# Применение шаблона конфигурации для репликации
+- name: Set up my.cnf for replication
+  template:
+    src: /etc/ansible/roles/mariadb_install/templates/my.cnf.j2
+    dest: /etc/mysql/my.cnf
+    owner: mysql
+    group: mysql
+    mode: '0644'
+  notify: Restart MariaDB
+
+# Перезапуск MariaDB после изменения конфигурации
+- name: Restart MariaDB
+  service:
+    name: mysql
+    state: restarted
+
+# Создаем пользователя для репликации
+- name: Create replication user
+  mysql_user:
+    name: "{{ mariadb_replication_user }}"
+    password: "{{ mariadb_replication_password }}"
+    priv: "*.*:REPLICATION SLAVE"
+    host: '%'
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Configure replication from server2 on server1
+  mysql_replication:
+    mode: changeprimary
+    primary_host: "172.21.0.4"  # IP второго сервера (web2)
+    primary_user: "{{ mariadb_replication_user }}"
+    primary_password: "{{ mariadb_replication_password }}"
+    master_log_file: "mysql-bin.000001"
+    master_log_pos: 4
+    login_user: root
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: inventory_hostname == groups['webservers'][0]
+
+- name: Configure replication from server1 on server2
+  mysql_replication:
+    mode: changeprimary
+    primary_host: "172.21.0.3"  # IP первого сервера (web1)
+    primary_user: "{{ mariadb_replication_user }}"
+    primary_password: "{{ mariadb_replication_password }}"
+    master_log_file: "mysql-bin.000001"
+    master_log_pos: 4
+    login_user: root
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  when: inventory_hostname == groups['webservers'][1]
+
+# Хендлер для перезапуска MariaDB
+- name: Restart MariaDB
+  service:
+    name: mysql
+    state: restarted
+EOL
+        then
+            output_status "Create the MariaDB tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the MariaDB tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 18: Create template for MariaDB configuration (replication)      #
+#########################################################################
+
+create_mariadb_template() {
+    local mariadb_template="/etc/ansible/roles/mariadb_install/templates/my.cnf.j2"
+    
+    if [ -f "$mariadb_template" ]; then
+        # File already exists
+        output_status "Create the MariaDB configuration template" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/mariadb_install/templates && cat <<EOL > "$mariadb_template"
+[mysqld]
+server-id = {{ mariadb_server_id }}
+log_bin = {{ ansible_hostname }}-bin.log
+relay-log = {{ ansible_hostname }}-relay-bin.log
+auto-increment-increment = 2
+auto-increment-offset = {{ mariadb_server_id }}
+binlog_do_db = {{ mariadb_wp_db_name }}  # Реплицируемая база данных
+log_slave_updates = 1
+skip_slave_start = 1
+EOL
+        then
+            output_status "Create the MariaDB configuration template" "Done" "$GREEN"
+        else
+            output_status "Create the MariaDB configuration template" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 19: Create handler file to restart MariaDB after configuration   #
+#########################################################################
+
+create_mariadb_handler_file() {
+    local mariadb_handler_file="/etc/ansible/roles/mariadb_install/handlers/main.yml"
+    
+    if [ -f "$mariadb_handler_file" ]; then
+        # File already exists
+        output_status "Create the MariaDB handler file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/mariadb_install/handlers && cat <<EOL > "$mariadb_handler_file"
+---
+- name: Restart MariaDB
+  service:
+    name: mysql
+    state: restarted
+EOL
+        then
+            output_status "Create the MariaDB handler file" "Done" "$GREEN"
+        else
+            output_status "Create the MariaDB handler file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 20: Create variable file for MariaDB installation role           #
+#########################################################################
+
+create_mariadb_vars_file() {
+    local mariadb_vars_file="/etc/ansible/roles/mariadb_install/vars/main.yml"
+    
+    if [ -f "$mariadb_vars_file" ]; then
+        # File already exists
+        output_status "Create the MariaDB variable file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/mariadb_install/vars && cat <<EOL > "$mariadb_vars_file"
+mariadb_wp_db_name: "wordpress"
+mariadb_server_id_offset: 1
+EOL
+        then
+            output_status "Create the MariaDB variable file" "Done" "$GREEN"
+        else
+            output_status "Create the MariaDB variable file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 21: Create tasks file for Firewall Role                          #
+#########################################################################
+
+create_firewall_tasks_file() {
+    local firewall_tasks_file="/etc/ansible/roles/firewall/tasks/main.yml"
+    
+    if [ -f "$firewall_tasks_file" ]; then
+        # File already exists
+        output_status "Create the Firewall tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/firewall/tasks && cat <<EOL > "$firewall_tasks_file"
+---
+# Открытие порта 3306 для внутренней сети
+- name: Open port 3306 for internal network
+  ufw:
+    rule: allow
+    port: '3306'
+    proto: tcp
+    from_ip: "{{ firewall_allowed_ip }}"
+  become: true
+EOL
+        then
+            output_status "Create the Firewall tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the Firewall tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 22: Create variables file for Firewall Role                      #
+#########################################################################
+
+create_firewall_vars_file() {
+    local firewall_vars_file="/etc/ansible/roles/firewall/defaults/main.yml"
+    
+    if [ -f "$firewall_vars_file" ]; then
+        # File already exists
+        output_status "Create the Firewall variables file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/firewall/defaults && cat <<EOL > "$firewall_vars_file"
+---
+firewall_allowed_ip: "172.21.0.0/24"
+EOL
+        then
+            output_status "Create the Firewall variables file" "Done" "$GREEN"
+        else
+            output_status "Create the Firewall variables file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 23: Create tasks file for adding entries to /etc/hosts           #
+#########################################################################
+
+create_hosts_management_tasks_file() {
+    local hosts_management_tasks_file="/etc/ansible/roles/hosts_management/tasks/main.yml"
+    
+    if [ -f "$hosts_management_tasks_file" ]; then
+        # File already exists
+        output_status "Create the Hosts Management tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/hosts_management/tasks && cat <<EOL > "$hosts_management_tasks_file"
+---
+# Добавление записи в /etc/hosts для каждого хоста
+- name: Add hostname for webserver1 and webserver2 in /etc/hosts
+  lineinfile:
+    dest: /etc/hosts
+    regexp: '^{{ ansible_host }}'
+    line: "{{ ansible_host }} {{ inventory_hostname }}"
+  become: true
+EOL
+        then
+            output_status "Create the Hosts Management tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the Hosts Management tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 24: Create general playbook for managing all roles               #
+#########################################################################
+
+create_general_playbook() {
+    local playbook_file="/etc/ansible/playbooks/site.yml"
+    
+    if [ -f "$playbook_file" ]; then
+        # File already exists
+        output_status "Create the general playbook" "Already created" "$YELLOW"
+    else
+        # Try to create the playbook with the specified content
+        if mkdir -p /etc/ansible/playbooks && cat <<EOL > "$playbook_file"
+---
+- hosts: webservers
+  become: true
+  vars_files:
+    - /etc/ansible/vars/secrets.yml
+  roles:
+    - apache_install
+    - php_install
+    - vhost_configuration
+    - user_management
+    - firewall
+    - hosts_management
+    - mariadb_install
+EOL
+        then
+            output_status "Create the general playbook" "Done" "$GREEN"
+        else
+            output_status "Create the general playbook
+}
+
+#########################################################################
+# Step 25: Display manual actions message                               #
+#########################################################################
+
+display_manual_actions_message() {
+    # Define colors for output using tput
+    local YELLOW=$(tput setaf 3)
+    local RED=$(tput setaf 1)
+    local GREEN=$(tput setaf 2)
+    local RESET=$(tput sgr0)
+    
+    # Print message in frame
+    echo "${GREEN}"
+    echo "!!!!Please perform the following actions manually!!!!! ${YELLOW}"
+    echo "!!!!Create Encrypted Variables with Ansible Vault to store passwords in a secure place!!!!! ${RED}"
+    echo "-------------------------------------------------------------------------------------------------"
+    echo "- Run in the console                                                                               -"
+    echo "- 1. export EDITOR=nano                                                                            -"
+    echo "- 2. ansible-vault create /etc/ansible/vars/secrets.yml (Enter the password)                       -"
+    echo "-------------------------------------------------------------------------------------------------"
+    echo "- And add variables to the “/etc/ansible/vars/secrets.yml” where you can define the password       -"
+    echo "- mariadb_root_password: \"your_password\"                                                         -"
+    echo "- mariadb_replication_user: \"repl_user\"                                                          -"
+    echo "- mariadb_replication_password: \"your_password\"                                                  -"
+    echo "- mariadb_wp_db_user: \"wp_user\"                                                                  -"
+    echo "- mariadb_wp_db_password: \"your_password\"                                                        -"
+    echo "-------------------------------------------------------------------------------------------------"
+    echo "${RESET}"
+}
+
+# Call the function at the end of your script
+display_manual_actions_message
+
+
+
 # Execute steps
+
+#Step 1
 install_ansible
+
+# Step 2
 install_ansible_galaxy
+
+# Step 3
 create_ansible_cfg
+
+# Step 4
 create_inventory_file
+
+# Step 5
 create_directory_structure
+
+# Step 6
+create_apache_variables_file
+
+# Step 7
+create_apache_tasks_file
+
+# Step 8
+create_apache_handlers_file
+
+# Step 9
+create_php_variables_file
+
+# Step 10
+create_php_tasks_file
+
+# Step 11
+create_php_fpm_template
+
+# Step 12
+create_php_fpm_handlers_file
+
+#Step 13
+create_user_management_variables_file
+
+#Step 14
+create_user_management_tasks_file
+
+#Step 15
+create_vhost_tasks_file
+
+#Step 16
+create_vhost_template
+
+#Step 17
+create_mariadb_tasks_file
+
+#Step 18
+create_mariadb_template
+
+#Step 19
+create_mariadb_handler_file
+
+#Step 20
+create_mariadb_vars_file
+
+#Step 21
+create_firewall_tasks_file
+
+#Step 22
+create_firewall_vars_file
+
+#Step 23
+create_hosts_management_tasks_file
+
+#Step 24
+create_general_playbook
+
+# Step 25 
+display_manual_actions_message
+
