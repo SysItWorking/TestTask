@@ -731,29 +731,27 @@ create_mariadb_tasks_file() {
     state: present
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-- name: Configure replication from server2 on server1
-  mysql_replication:
-    mode: changeprimary
-    primary_host: "172.21.0.4"  # IP второго сервера (web2)
-    primary_user: "{{ mariadb_replication_user }}"
-    primary_password: "{{ mariadb_replication_password }}"
-    master_log_file: "mysql-bin.000001"
-    master_log_pos: 4
+# Создаем пользователя для репликации на web1 с доступом с IP web2
+- name: Create replication user for web2 on web1
+  mysql_user:
+    name: "{{ mariadb_replication_user }}"
+    password: "{{ mariadb_replication_password }}"
+    priv: "*.*:REPLICATION SLAVE"
+    host: "{{ hostvars['web2'].ansible_host }}"  # IP второго сервера (web2)
+    state: present
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
-  when: inventory_hostname == groups['webservers'][0]
 
-- name: Configure replication from server1 on server2
-  mysql_replication:
-    mode: changeprimary
-    primary_host: "172.21.0.3"  # IP первого сервера (web1)
-    primary_user: "{{ mariadb_replication_user }}"
-    primary_password: "{{ mariadb_replication_password }}"
-    master_log_file: "mysql-bin.000001"
-    master_log_pos: 4
+# Создаем пользователя для репликации на web2 с доступом с IP web1
+- name: Create replication user for web1 on web2
+  mysql_user:
+    name: "{{ mariadb_replication_user }}"
+    password: "{{ mariadb_replication_password }}"
+    priv: "*.*:REPLICATION SLAVE"
+    host: "{{ hostvars['web1'].ansible_host }}"  # IP первого сервера (web1)
+    state: present
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
-  when: inventory_hostname == groups['webservers'][1]
 
 # Хендлер для перезапуска MariaDB
 - name: Restart MariaDB
