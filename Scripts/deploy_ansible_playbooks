@@ -792,6 +792,7 @@ auto-increment-offset = {{ mariadb_server_id }}
 binlog_do_db = {{ mariadb_wp_db_name }}  # Реплицируемая база данных
 log_slave_updates = 1
 skip_slave_start = 1
+skip-name-resolve
 EOL
         then
             output_status "Create the MariaDB configuration template" "Done" "$GREEN"
