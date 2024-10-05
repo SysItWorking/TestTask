@@ -683,6 +683,16 @@ create_mariadb_tasks_file() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/mariadb_install/tasks && cat <<EOL > "$mariadb_tasks_file"
 ---
+- name: Ensure Python 3 and MySQL libraries are installed
+  apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-mysqldb
+      - python3-pymysql
+    state: present
+    update_cache: yes
+
 - name: Ensure MariaDB is installed
   apt:
     name: mariadb-server
@@ -835,6 +845,8 @@ create_mariadb_vars_file() {
         if mkdir -p /etc/ansible/roles/mariadb_install/vars && cat <<EOL > "$mariadb_vars_file"
 mariadb_wp_db_name: "wordpress"
 mariadb_server_id_offset: 1
+# Dynamically set mariadb_server_id based on inventory_hostname:
+mariadb_server_id: "{{ play_hosts.index(inventory_hostname) + mariadb_server_id_offset }}"
 EOL
         then
             output_status "Create the MariaDB variable file" "Done" "$GREEN"
