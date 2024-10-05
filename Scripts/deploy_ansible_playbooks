@@ -151,11 +151,11 @@ create_directory_structure() {
 
     # Output status based on the results
     if [ "$all_created" = true ] && [ "$already_exists" = false ]; then
-        output_status "Create the 'ansible' directory and configure Inventory file" "Done" "$GREEN"
+        output_status "Creating the 'ansible' directories structure" "Done" "$GREEN"
     elif [ "$all_created" = true ] && [ "$already_exists" = true ]; then
-        output_status "Create the 'ansible' directory and configure Inventory file" "Already created" "$YELLOW"
+        output_status "Creating the 'ansible' directories structure" "Already created" "$YELLOW"
     else
-        output_status "Create the 'ansible' directory and configure Inventory file" "error" "$RED"
+        output_status "Creating the 'ansible' directories structure" "error" "$RED"
         exit 1
     fi
 }
