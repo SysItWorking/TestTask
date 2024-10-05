@@ -106,7 +106,7 @@ EOL
 }
 
 #########################################################################
-# Step 5: Create directory structure to deploy and configure roles      #
+# Step 5: Create the 'ansible' directory and configure Inventory file   #
 #########################################################################
 
 create_directory_structure() {
@@ -133,23 +133,29 @@ create_directory_structure() {
         "/etc/ansible/templates"
         "/etc/ansible/roles/hosts_management/tasks"
     )
-    
-    local all_created=true  # Flag to track if all directories were created successfully
+
+    local all_created=true  # Flag to track overall success
+    local already_exists=false  # Flag to track if directories were already created
     
     for dir in "${directories[@]}"; do
-        # Create directory if it does not exist
-        if [ ! -d "$dir" ]; then
-            if ! mkdir -p "$dir"; then
+        if [ -d "$dir" ]; then
+            already_exists=true
+        else
+            if mkdir -p "$dir"; then
+                continue
+            else
                 all_created=false
             fi
         fi
     done
-    
-    # Output single status message based on the result of all directory creations
-    if [ "$all_created" = true ]; then
-        output_status "Create directory structure" "Done" "$GREEN"
+
+    # Output status based on the results
+    if [ "$all_created" = true ] && [ "$already_exists" = false ]; then
+        output_status "Create the 'ansible' directory and configure Inventory file" "Done" "$GREEN"
+    elif [ "$all_created" = true ] && [ "$already_exists" = true ]; then
+        output_status "Create the 'ansible' directory and configure Inventory file" "Already created" "$YELLOW"
     else
-        output_status "Create directory structure" "error" "$RED"
+        output_status "Create the 'ansible' directory and configure Inventory file" "error" "$RED"
         exit 1
     fi
 }
