@@ -393,7 +393,7 @@ create_php_tasks_file() {
 # Configure PHP-FPM pool for 'web' user
 - name: Configure PHP-FPM pool for 'web'
   template:
-    src: /etc/ansible/templates/php-fpm-pool.j2
+    src: /etc/ansible/roles/php_install/templates/php-fpm-pool.j2
     dest: "{{ php_fpm_pool_dir }}/{{ user }}.conf"
   notify: restart_php_fpm
 
