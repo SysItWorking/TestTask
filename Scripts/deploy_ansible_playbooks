@@ -1,0 +1,166 @@
+#!/bin/bash
+
+# Colors for output using tput
+YELLOW=$(tput setaf 3)
+GREEN=$(tput setaf 2)
+RED=$(tput setaf 1)
+RESET=$(tput sgr0)
+
+# Function to calculate padding and align statuses
+output_status() {
+    local message=$1
+    local status=$2
+    local color=$3
+    local total_width=85  # Total width for the message + status
+    local message_length=${#message}  # Calculate the length of the message
+    local padding=$((total_width - message_length))  # Calculate how many spaces to add
+
+    # Output the message, padded with spaces, and then the status
+    printf "%s%*s [%b%s%b]\n" "$message" "$padding" "" "$color" "$status" "$RESET"
+}
+###################################
+# Step 1: Install Ansible package #
+###################################
+install_ansible() {
+    if dpkg -s ansible &> /dev/null; then
+        # Ansible is already installed
+        output_status "Install Ansible package on the server" "Already installed" "$YELLOW"
+    else
+        # Try to install Ansible
+        if apt install ansible -y &> /dev/null; then
+            output_status "Install Ansible package on the server" "Done" "$GREEN"
+        else
+            output_status "Install Ansible package on the server" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+#############################################
+# Step 2: Install Ansible Galaxy collection #
+#############################################
+install_ansible_galaxy() {
+    if ansible-galaxy collection list | grep -q 'community.general'; then
+        # Collection is already installed
+        output_status "Install Ansible Galaxy collection" "Already installed" "$YELLOW"
+    else
+        # Try to install the collection
+        if ansible-galaxy collection install community.general &> /dev/null; then
+            output_status "Install Ansible Galaxy collection" "Done" "$GREEN"
+        else
+            output_status "Install Ansible Galaxy collection" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+#######################################
+# Step 3: Create the ansible.cfg file #
+#######################################
+create_ansible_cfg() {
+    local ansible_cfg_file="/etc/ansible/ansible.cfg"
+    
+    if [ -f "$ansible_cfg_file" ]; then
+        # File already exists
+        output_status "Create the main 'ansible.cfg' file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible && cat <<EOL > "$ansible_cfg_file"
+[defaults]
+inventory = /etc/ansible/hosts
+remote_user = deploy
+ask_pass = false
+ask_become_pass = false
+roles_path = /etc/ansible/roles
+EOL
+        then
+            output_status "Create the main 'ansible.cfg' file" "Done" "$GREEN"
+        else
+            output_status "Create the main 'ansible.cfg' file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 4: Create the ansible directory and configure the Inventory file #
+#########################################################################
+create_inventory_file() {
+    local inventory_file="/etc/ansible/hosts"
+    
+    if [ -f "$inventory_file" ]; then
+        # Inventory file already exists
+        output_status "Create the 'ansible' directory and configure Inventory file" "Already created" "$YELLOW"
+    else
+        # Try to create the directory and inventory file with the specified content
+        if mkdir -p /etc/ansible && cat <<EOL > "$inventory_file"
+[webservers]
+web1 ansible_host=172.21.0.3 ansible_user=deploy ansible_port=7856 ansible_ssh_private_key_file=/home/deploy/.ssh/id_rsa ansible_become=true
+web2 ansible_host=172.21.0.4 ansible_user=deploy ansible_port=7856 ansible_ssh_private_key_file=/home/deploy/.ssh/id_rsa ansible_become=true
+EOL
+        then
+            output_status "Create the 'ansible' directory and configure Inventory file" "Done" "$GREEN"
+        else
+            output_status "Create the 'ansible' directory and configure Inventory file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+###########################################################################
+# Step 5: Create directory structure to deploy and configure Apache, PHP, #
+# user management, virtual hosts, MariaDB, firewall, and templates        #
+###########################################################################
+
+create_directory_structure() {
+    # Define an array of directories to create
+    local directories=(
+        "/etc/ansible/playbooks"
+        "/etc/ansible/roles/apache_install/tasks"
+        "/etc/ansible/roles/apache_install/handlers"
+        "/etc/ansible/roles/apache_install/defaults"
+        "/etc/ansible/roles/php_install/tasks"
+        "/etc/ansible/roles/php_install/handlers"
+        "/etc/ansible/roles/php_install/defaults"
+        "/etc/ansible/roles/user_management/tasks"
+        "/etc/ansible/roles/user_management/defaults"
+        "/etc/ansible/roles/vhost_configuration/tasks"
+        "/etc/ansible/roles/vhost_configuration/defaults"
+        "/etc/ansible/roles/mariadb_install/tasks"
+        "/etc/ansible/roles/mariadb_install/handlers"
+        "/etc/ansible/roles/mariadb_install/templates"
+        "/etc/ansible/roles/mariadb_install/defaults"
+        "/etc/ansible/roles/mariadb_install/vars"
+        "/etc/ansible/roles/firewall/tasks"
+        "/etc/ansible/roles/firewall/defaults"
+        "/etc/ansible/templates"
+        "/etc/ansible/roles/hosts_management/tasks"
+    )
+    
+    local all_created=true  # Flag to track if all directories were created successfully
+    
+    for dir in "${directories[@]}"; do
+        if [ -d "$dir" ]; then
+            # Directory already exists
+            output_status "Create directory $dir" "Already exists" "$YELLOW"
+        else
+            # Try to create the directory
+            if mkdir -p "$dir"; then
+                output_status "Create directory $dir" "Done" "$GREEN"
+            else
+                output_status "Create directory $dir" "error" "$RED"
+                all_created=false
+            fi
+        fi
+    done
+    
+    # If any directory failed to create, exit with an error code
+    if [ "$all_created" = false ]; then
+        exit 1
+    fi
+}
+
+# Execute steps
+install_ansible
+install_ansible_galaxy
+create_ansible_cfg
+create_inventory_file
+create_directory_structure
