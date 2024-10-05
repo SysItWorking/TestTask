@@ -57,7 +57,7 @@ install_ansible_galaxy() {
 #######################################
 create_ansible_cfg() {
     local ansible_cfg_file="/etc/ansible/ansible.cfg"
-    
+
     if [ -f "$ansible_cfg_file" ]; then
         # File already exists
         output_status "Create the main 'ansible.cfg' file" "Already created" "$YELLOW"
@@ -85,7 +85,7 @@ EOL
 #########################################################################
 create_inventory_file() {
     local inventory_file="/etc/ansible/hosts"
-    
+
     if [ -f "$inventory_file" ]; then
         # Inventory file already exists
         output_status "Create the 'ansible' directory and configure Inventory file" "Already created" "$YELLOW"
@@ -135,7 +135,7 @@ create_directory_structure() {
 
     local all_created=true  # Flag to track overall success
     local already_exists=false  # Flag to track if directories were already created
-    
+
     for dir in "${directories[@]}"; do
         if [ -d "$dir" ]; then
             already_exists=true
@@ -165,7 +165,7 @@ create_directory_structure() {
 
 create_apache_variables_file() {
     local apache_vars_file="/etc/ansible/roles/apache_install/defaults/main.yml"
-    
+
     if [ -f "$apache_vars_file" ]; then
         # File already exists
         output_status "Create the Apache variables file" "Already created" "$YELLOW"
@@ -196,7 +196,7 @@ EOL
 
 create_apache_tasks_file() {
     local apache_tasks_file="/etc/ansible/roles/apache_install/tasks/main.yml"
-    
+
     if [ -f "$apache_tasks_file" ]; then
         # File already exists
         output_status "Create the Apache tasks file" "Already created" "$YELLOW"
@@ -260,7 +260,7 @@ EOL
 
 create_apache_handlers_file() {
     local apache_handlers_file="/etc/ansible/roles/apache_install/handlers/main.yml"
-    
+
     if [ -f "$apache_handlers_file" ]; then
         # File already exists
         output_status "Create the Apache handlers file" "Already created" "$YELLOW"
@@ -303,7 +303,7 @@ EOL
 
 create_php_variables_file() {
     local php_vars_file="/etc/ansible/roles/php_install/defaults/main.yml"
-    
+
     if [ -f "$php_vars_file" ]; then
         # File already exists
         output_status "Create the PHP variables file" "Already created" "$YELLOW"
@@ -329,7 +329,7 @@ EOL
 
 create_php_tasks_file() {
     local php_tasks_file="/etc/ansible/roles/php_install/tasks/main.yml"
-    
+
     if [ -f "$php_tasks_file" ]; then
         # File already exists
         output_status "Create the PHP tasks file" "Already created" "$YELLOW"
@@ -419,7 +419,7 @@ EOL
 
 create_php_fpm_template() {
     local php_fpm_template="/etc/ansible/roles/php_install/templates/php-fpm-pool.j2"
-    
+
     if [ -f "$php_fpm_template" ]; then
         # File already exists
         output_status "Create the PHP-FPM pool configuration template" "Already created" "$YELLOW"
@@ -460,7 +460,7 @@ EOL
 
 create_php_fpm_handlers_file() {
     local php_fpm_handlers_file="/etc/ansible/roles/php_install/handlers/main.yml"
-    
+
     if [ -f "$php_fpm_handlers_file" ]; then
         # File already exists
         output_status "Create the PHP-FPM handlers file" "Already created" "$YELLOW"
@@ -497,7 +497,7 @@ EOL
 
 create_user_management_variables_file() {
     local user_management_vars_file="/etc/ansible/roles/user_management/defaults/main.yml"
-    
+
     if [ -f "$user_management_vars_file" ]; then
         # File already exists
         output_status "Create the User Management variables file" "Already created" "$YELLOW"
@@ -525,7 +525,7 @@ EOL
 
 create_user_management_tasks_file() {
     local user_management_tasks_file="/etc/ansible/roles/user_management/tasks/main.yml"
-    
+
     if [ -f "$user_management_tasks_file" ]; then
         # File already exists
         output_status "Create the User Management tasks file" "Already created" "$YELLOW"
@@ -594,7 +594,7 @@ EOL
 
 create_vhost_tasks_file() {
     local vhost_tasks_file="/etc/ansible/roles/vhost_configuration/tasks/main.yml"
-    
+
     if [ -f "$vhost_tasks_file" ]; then
         # File already exists
         output_status "Create the Virtual Host tasks file" "Already created" "$YELLOW"
@@ -627,7 +627,7 @@ EOL
 
 create_vhost_template() {
     local vhost_template="/etc/ansible/roles/vhost_configuration/templates/vhost.j2"
-    
+
     if [ -f "$vhost_template" ]; then
         # File already exists
         output_status "Create the Virtual Host template" "Already created" "$YELLOW"
@@ -675,7 +675,7 @@ EOL
 
 create_mariadb_tasks_file() {
     local mariadb_tasks_file="/etc/ansible/roles/mariadb_install/tasks/main.yml"
-    
+
     if [ -f "$mariadb_tasks_file" ]; then
         # File already exists
         output_status "Create the MariaDB tasks file" "Already created" "$YELLOW"
@@ -766,7 +766,7 @@ EOL
 
 create_mariadb_template() {
     local mariadb_template="/etc/ansible/roles/mariadb_install/templates/my.cnf.j2"
-    
+
     if [ -f "$mariadb_template" ]; then
         # File already exists
         output_status "Create the MariaDB configuration template" "Already created" "$YELLOW"
@@ -798,7 +798,7 @@ EOL
 
 create_mariadb_handler_file() {
     local mariadb_handler_file="/etc/ansible/roles/mariadb_install/handlers/main.yml"
-    
+
     if [ -f "$mariadb_handler_file" ]; then
         # File already exists
         output_status "Create the MariaDB handler file" "Already created" "$YELLOW"
@@ -826,7 +826,7 @@ EOL
 
 create_mariadb_vars_file() {
     local mariadb_vars_file="/etc/ansible/roles/mariadb_install/vars/main.yml"
-    
+
     if [ -f "$mariadb_vars_file" ]; then
         # File already exists
         output_status "Create the MariaDB variable file" "Already created" "$YELLOW"
@@ -851,7 +851,7 @@ EOL
 
 create_firewall_tasks_file() {
     local firewall_tasks_file="/etc/ansible/roles/firewall/tasks/main.yml"
-    
+
     if [ -f "$firewall_tasks_file" ]; then
         # File already exists
         output_status "Create the Firewall tasks file" "Already created" "$YELLOW"
@@ -883,7 +883,7 @@ EOL
 
 create_firewall_vars_file() {
     local firewall_vars_file="/etc/ansible/roles/firewall/defaults/main.yml"
-    
+
     if [ -f "$firewall_vars_file" ]; then
         # File already exists
         output_status "Create the Firewall variables file" "Already created" "$YELLOW"
@@ -908,7 +908,7 @@ EOL
 
 create_hosts_management_tasks_file() {
     local hosts_management_tasks_file="/etc/ansible/roles/hosts_management/tasks/main.yml"
-    
+
     if [ -f "$hosts_management_tasks_file" ]; then
         # File already exists
         output_status "Create the Hosts Management tasks file" "Already created" "$YELLOW"
@@ -939,7 +939,7 @@ EOL
 
 create_general_playbook() {
     local playbook_file="/etc/ansible/playbooks/site.yml"
-    
+
     if [ -f "$playbook_file" ]; then
         # File already exists
         output_status "Create the general playbook" "Already created" "$YELLOW"
@@ -963,43 +963,48 @@ EOL
         then
             output_status "Create the general playbook" "Done" "$GREEN"
         else
-            output_status "Create the general playbook
+            output_status "Create the general playbook" "error" "$RED"
+            exit 1
+        fi
+    fi
 }
-
-#########################################################################
-# Step 25: Display manual actions message                               #
-#########################################################################
 
 display_manual_actions_message() {
     # Define colors for output using tput
-    local YELLOW=$(tput setaf 3)
-    local RED=$(tput setaf 1)
-    local GREEN=$(tput setaf 2)
-    local RESET=$(tput sgr0)
-    
-    # Print message in frame
-    echo "${GREEN}"
-    echo "!!!!Please perform the following actions manually!!!!! ${YELLOW}"
-    echo "!!!!Create Encrypted Variables with Ansible Vault to store passwords in a secure place!!!!! ${RED}"
-    echo "-------------------------------------------------------------------------------------------------"
-    echo "- Run in the console                                                                               -"
-    echo "- 1. export EDITOR=nano                                                                            -"
-    echo "- 2. ansible-vault create /etc/ansible/vars/secrets.yml (Enter the password)                       -"
-    echo "-------------------------------------------------------------------------------------------------"
-    echo "- And add variables to the “/etc/ansible/vars/secrets.yml” where you can define the password       -"
-    echo "- mariadb_root_password: \"your_password\"                                                         -"
-    echo "- mariadb_replication_user: \"repl_user\"                                                          -"
-    echo "- mariadb_replication_password: \"your_password\"                                                  -"
-    echo "- mariadb_wp_db_user: \"wp_user\"                                                                  -"
-    echo "- mariadb_wp_db_password: \"your_password\"                                                        -"
-    echo "-------------------------------------------------------------------------------------------------"
+    local YELLOW
+    local RED
+    local WHITE
+    local RESET
+
+    YELLOW=$(tput setaf 3)
+    RED=$(tput setaf 1)
+    WHITE=$(tput setaf 7)
+    RESET=$(tput sgr0)
+
+    # Print message with custom colors
+    echo "${WHITE}"
+    echo "!!!!Please perform the following actions manually!!!!!"
+    echo "!!!!Create Encrypted Variables with Ansible Vault to store passwords in a secure place!!!!!"
+    echo "${RED}-------------------------------------------------------------------------------------------------${WHITE}"
+    echo "- Run in the console                                                                            -"
+    echo "- 1. export EDITOR=nano                                                                         -"
+    echo "- 2. ansible-vault create /etc/ansible/vars/secrets.yml (Set the password for the file)         -"
+    echo "${RED}-------------------------------------------------------------------------------------------------${WHITE}"
+    echo "- And add variables to the /etc/ansible/vars/secrets.yml where you can define the password      -"
+    echo "- mariadb_root_password: your_password                                                          -"
+    echo "- mariadb_replication_user: repl_user                                                           -"
+    echo "- mariadb_replication_password: your_password                                                   -"
+    echo "- mariadb_wp_db_user: wp_user                                                                   -"
+    echo "- mariadb_wp_db_password: your_password                                                         -"
+    echo "${RED}-------------------------------------------------------------------------------------------------${RESET}"
+    echo ""
+    echo "${YELLOW}Run the Test command to make sure that Ansible may connect to the remote hosts:"
+    echo "ansible all -m ping -i /etc/ansible/hosts"
+    echo ""
+    echo "If all looks fine, please run (where you need to enter the pass from the step above):"
+    echo "ansible-playbook /etc/ansible/playbooks/site.yml --ask-vault-pass"
     echo "${RESET}"
 }
-
-# Call the function at the end of your script
-display_manual_actions_message
-
-
 
 # Execute steps
 
@@ -1075,6 +1080,5 @@ create_hosts_management_tasks_file
 #Step 24
 create_general_playbook
 
-# Step 25 
+# Step 25
 display_manual_actions_message
-
