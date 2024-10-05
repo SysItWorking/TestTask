@@ -29,14 +29,13 @@ print_color "Creating 'deploy' user" "yellow"
 if id "deploy" &>/dev/null; then
     print_color "User 'deploy' already exists" "purple"
 else
-    adduser --gecos "" deploy && usermod -aG sudo deploy
+    useradd -m -s /bin/bash deploy && usermod -aG sudo deploy
     if [ $? -eq 0 ]; then
         print_color "User 'deploy' created and added to sudo group" "green"
     else
         print_color "Failed to create user 'deploy'" "red"
     fi
 fi
-
 print_color "" "none" # Blank line
 
 # Adding sudoers entry for 'deploy' user without password
