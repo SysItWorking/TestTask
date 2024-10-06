@@ -1129,7 +1129,421 @@ EOL
 }
 
 #########################################################################
-# Step 25: Create general playbook for managing all roles               #
+# Step 25: Create role to deploy NFS Server on the LoadBalancing Server #
+#########################################################################
+
+create_nfs_setup_playbook() {
+    local playbook_file="/etc/ansible/roles/nfs_setup/tasks/main.yml"
+
+    if [ -f "$playbook_file" ]; then
+        # File already exists
+        output_status "Create the NFS Setup playbook" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/nfs_setup/tasks && cat <<EOL > "$playbook_file"
+---
+- name: Install necessary packages
+  apt:
+    name:
+      - nfs-kernel-server
+      - mariadb-client
+    state: present
+    update_cache: yes
+
+# Check if the web group exists on LoadBalancing server
+- name: Check if web group exists on LoadBalancing server
+  command: getent group web
+  register: group_exists
+  ignore_errors: yes  # Ignore error if group is not found
+
+# Create web group if it does not exist
+- name: Create web group if it does not exist
+  group:
+    name: web
+    gid: 1002
+  when: group_exists.rc != 0  # If group does not exist (return code != 0)
+
+# Check if the web user exists on LoadBalancing server
+- name: Check if web user exists on LoadBalancing server
+  command: getent passwd web
+  register: user_exists
+  ignore_errors: yes
+
+# Create web user if it does not exist
+- name: Create web user if it does not exist
+  user:
+    name: web
+    uid: 1002
+    group: web
+    home: /srv/nfs/wordpress
+    createhome: no
+    shell: /bin/bash
+  when: user_exists.rc != 0  # Execute task if return code is not 0
+
+# NFS setup
+- name: Check if WordPress directory exists
+  stat:
+    path: "{{ nfs_wordpress_path }}"
+  register: wordpress_directory
+
+- name: Display current permissions on /srv
+  command: ls -la /srv
+  register: srv_listing
+  ignore_errors: yes
+
+- name: Show contents of /srv
+  debug:
+    var: srv_listing.stdout_lines
+
+- name: Create nested directories for WordPress if they do not exist
+  file:
+    path: "{{ nfs_wordpress_path }}"
+    state: directory
+    owner: web
+    group: web
+    mode: '0755'
+    recurse: yes
+
+- name: Add NFS export to /etc/exports
+  lineinfile:
+    path: /etc/exports
+    line: "{{ nfs_wordpress_path }} {{ item }}({{ nfs_exports_options }})"
+    create: yes
+  loop: "{{ nfs_allowed_clients }}"
+
+- name: Apply NFS changes
+  command: exportfs -ra
+
+- name: Check NFS export
+  command: exportfs -v
+  register: exportfs_output
+
+- name: Set port for mountd in /etc/default/nfs-kernel-server
+  lineinfile:
+    path: /etc/default/nfs-kernel-server
+    regexp: '^MOUNTD_PORT='
+    line: "MOUNTD_PORT={{ nfs_mountd_port }}"
+    create: yes
+
+- name: Restart NFS server
+  service:
+    name: nfs-kernel-server
+    state: restarted
+
+- name: Restart rpcbind
+  service:
+    name: rpcbind
+    state: restarted
+
+- name: Enable NFS server on startup
+  service:
+    name: nfs-kernel-server
+    enabled: yes
+EOL
+        then
+            output_status "Create the NFS Setup playbook" "Done" "$GREEN"
+        else
+            output_status "Create the NFS Setup playbook" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 26: Create a file with variables for NFS server setup          #
+#########################################################################
+
+create_nfs_variables_file() {
+    local variables_file="/etc/ansible/roles/nfs_server_setup/defaults/main.yml"
+
+    if [ -f "$variables_file" ]; then
+        # File already exists
+        output_status "Create the NFS Variables file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/nfs_server_setup/defaults && cat <<EOL > "$variables_file"
+nfs_wordpress_path: /srv/nfs/wordpress
+nfs_allowed_clients:
+  - 172.21.0.3
+  - 172.21.0.4
+nfs_mountd_port: 20048
+nfs_exports_options: "rw,sync,no_subtree_check,no_root_squash"
+EOL
+        then
+            output_status "Create the NFS Variables file" "Done" "$GREEN"
+        else
+            output_status "Create the NFS Variables file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 27: Create a role to mount the NFS filesystem on the webservers  #
+#########################################################################
+
+create_nfs_client_mount_role() {
+    local tasks_file="/etc/ansible/roles/nfs_client_mount/tasks/main.yml"
+
+    if [ -f "$tasks_file" ]; then
+        # File already exists
+        output_status "Create the NFS Client Mount role" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/nfs_client_mount/tasks && cat <<EOL > "$tasks_file"
+---
+- name: Check hostname
+  debug:
+    msg: "Current hostname: {{ ansible_hostname }}"
+
+- name: Install NFS client
+  apt:
+    name: nfs-common
+    state: present
+    update_cache: yes
+
+- name: Check if WordPress directory exists
+  stat:
+    path: /var/www/web/public_html
+  register: wordpress_directory
+
+- name: Assert WordPress directory exists
+  assert:
+    that:
+      - wordpress_directory.stat.exists
+    fail_msg: "Directory /var/www/web/public_html does not exist"
+
+- name: Create WordPress directory if it does not exist
+  file:
+    path: /var/www/web/public_html
+    state: directory
+    owner: web
+    group: web
+    mode: '0755'
+  when: not wordpress_directory.stat.exists
+
+- name: Check mount status on Webserver1
+  shell: "mount | grep /var/www/web/public_html || true"
+  register: mount_status_web1
+  when: "'web1' in inventory_hostname"
+
+- name: Debug information mount on Webserver1
+  debug:
+    msg: "Mount status on Webserver1: {{ mount_status_web1.stdout }}"
+  when: mount_status_web1 is defined and 'stdout' in mount_status_web1
+
+- name: Check mount status on Webserver2
+  shell: "mount | grep /var/www/web/public_html || true"
+  register: mount_status_web2
+  when: "'web2' in inventory_hostname"
+
+- name: Debug information mount on Webserver2
+  debug:
+    msg: "Mount status on Webserver2: {{ mount_status_web2.stdout }}"
+  when: mount_status_web2 is defined and 'stdout' in mount_status_web2
+
+- name: Mount NFS share on Webserver1
+  mount:
+    src: "172.21.0.1:/srv/nfs/wordpress"
+    path: /var/www/web/public_html
+    fstype: nfs
+    opts: defaults
+    state: mounted
+  when: "'web1' in inventory_hostname"
+
+- name: Mount NFS share on Webserver2
+  mount:
+    src: "172.21.0.1:/srv/nfs/wordpress"
+    path: /var/www/web/public_html
+    fstype: nfs
+    opts: defaults
+    state: mounted
+  when: "'web2' in inventory_hostname"
+
+- name: Add fstab entry for Webserver1
+  lineinfile:
+    path: /etc/fstab
+    line: "172.21.0.1:/srv/nfs/wordpress /var/www/web/public_html nfs defaults 0 0"
+  when: "'web1' in inventory_hostname"
+
+- name: Add fstab entry for Webserver2
+  lineinfile:
+    path: /etc/fstab
+    line: "172.21.0.1:/srv/nfs/wordpress /var/www/web/public_html nfs defaults 0 0"
+  when: "'web2' in inventory_hostname"
+EOL
+        then
+            output_status "Create the NFS Client Mount role" "Done" "$GREEN"
+        else
+            output_status "Create the NFS Client Mount role" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 28: Create a role to install WordPress in the NFS directory     #
+#########################################################################
+
+create_wordpress_install_role() {
+    local tasks_file="/etc/ansible/roles/wordpress_install/tasks/main.yml"
+
+    if [ -f "$tasks_file" ]; then
+        # File already exists
+        output_status "Create the WordPress Install role" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/wordpress_install/tasks && cat <<EOL > "$tasks_file"
+---
+- name: Download and install WordPress
+  get_url:
+    url: https://wordpress.org/latest.tar.gz
+    dest: /srv/nfs/wordpress/latest.tar.gz
+
+- name: Unarchive WordPress
+  unarchive:
+    src: /srv/nfs/wordpress/latest.tar.gz
+    dest: /srv/nfs/wordpress
+    remote_src: yes
+
+- name: Install rsync
+  apt:
+    name: rsync
+    state: present
+    update_cache: yes
+
+- name: Check if the WordPress files directory exists
+  stat:
+    path: /srv/nfs/wordpress/wordpress
+  register: wordpress_directory_exists
+
+- name: Set owner and group for WordPress files
+  file:
+    path: /srv/nfs/wordpress/wordpress
+    owner: web
+    group: web
+    recurse: yes
+  when: wordpress_directory_exists.stat.exists == true
+
+- name: Copy WordPress files to main directory using rsync
+  synchronize:
+    src: /srv/nfs/wordpress/wordpress/
+    dest: /srv/nfs/wordpress/
+    owner: yes
+    group: yes
+    recursive: yes
+  when: wordpress_directory_exists.stat.exists == true
+
+- name: Remove empty WordPress directory
+  file:
+    path: /srv/nfs/wordpress/wordpress
+    state: absent
+    force: yes
+  when: wordpress_directory_exists.stat.exists == true
+
+- name: Remove downloaded archive
+  file:
+    path: /srv/nfs/wordpress/latest.tar.gz
+    state: absent
+
+- name: Set permissions on WordPress directory
+  file:
+    path: /srv/nfs/wordpress
+    owner: web
+    group: web
+    recurse: yes
+    mode: '0755'
+EOL
+        then
+            output_status "Create the WordPress Install role" "Done" "$GREEN"
+        else
+            output_status "Create the WordPress Install role" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 29: Create role for WordPress configuration                    #
+#########################################################################
+
+create_wordpress_config_role() {
+    local tasks_file="/etc/ansible/roles/wordpress_config/tasks/main.yml"
+
+    if [ -f "$tasks_file" ]; then
+        # File already exists
+        output_status "Create the WordPress Config role" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/wordpress_config/tasks && cat <<EOL > "$tasks_file"
+---
+- name: Load encrypted variables from Ansible Vault
+  include_vars:
+    file: /etc/ansible/vars/secrets.yml
+
+- name: Check if wp-config.php exists
+  stat:
+    path: /var/www/web/public_html/wp-config.php
+  register: wp_config_exists
+
+- name: Copy wp-config-sample.php to wp-config.php if it does not exist
+  copy:
+    src: /var/www/web/public_html/wp-config-sample.php
+    dest: /var/www/web/public_html/wp-config.php
+    owner: web
+    group: web
+    mode: '0644'
+    remote_src: yes
+  when: wp_config_exists.stat.exists == false
+
+- name: Configure database parameters in wp-config.php
+  lineinfile:
+    path: /var/www/web/public_html/wp-config.php
+    regexp: "^define\\(\\s*'{{ item.key }}'"
+    line: "define( '{{ item.key }}', '{{ item.value }}' );"
+  loop:
+    - { key: 'DB_NAME', value: 'wordpress_db' }
+    - { key: 'DB_USER', value: '{{ mariadb_wp_db_user }}' }
+    - { key: 'DB_PASSWORD', value: '{{ mariadb_wp_db_password }}' }
+    - { key: 'DB_HOST', value: "{{ hostvars[\"web1\"].ansible_host }}" }
+
+- name: Set correct permissions on wp-config.php
+  file:
+    path: /var/www/web/public_html/wp-config.php
+    owner: web
+    group: web
+    mode: '0644'
+
+# Install wp-cli
+- name: Download wp-cli
+  get_url:
+    url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    dest: /usr/local/bin/wp
+    mode: '0755'
+
+- name: Install WordPress using wp-cli
+  command: >
+    sudo -u web wp core install
+    --url="http://testtask.com"
+    --title="My WordPress Site"
+    --admin_user="admin"
+    --admin_password="testtask"
+    --admin_email="support@testtask.com"
+    --path=/var/www/web/public_html
+  args:
+    chdir: /var/www/web/public_html
+EOL
+        then
+            output_status "Create the WordPress Config role" "Done" "$GREEN"
+        else
+            output_status "Create the WordPress Config role" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 1X: Create general playbook for managing all roles               #
 #########################################################################
 
 create_general_playbook() {
@@ -1142,12 +1556,21 @@ create_general_playbook() {
         # Try to create the playbook with the specified content
         if mkdir -p /etc/ansible/playbooks && cat <<EOL > "$playbook_file"
 ---
+- hosts: loadbalancing
+  become: true
+  vars_files:
+    - /etc/ansible/vars/secrets.yml
+  roles:
+    - nfs_server_setup  # First, let's set up the NFS server
+    - wordpress_install  # Then we will install WordPress on NFS
+    - firewall
+
 - hosts: webservers
   become: true
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - apache_install
+   - apache_install
     - php_install
     - vhost_configuration
     - user_management
@@ -1155,6 +1578,12 @@ create_general_playbook() {
     - hosts_management
     - mariadb_install
     - mariadb_replication
+    - nfs_client_mount
+
+- hosts: web1
+  become: true
+  roles:
+    - wordpress_config  # And finally, we set up WordPress on web1
 EOL
         then
             output_status "Create the general playbook" "Done" "$GREEN"
@@ -1274,13 +1703,25 @@ create_firewall_vars_file
 create_hosts_management_tasks_file
 
 #Step 24
-create_general_playbook
-
-#Step 25
 create_mariadb_replication_tasks_file
 
 #Step 25
+create_nfs_setup_playbook
+
+#Step 26
+create_nfs_variables_file
+
+#Step 27
+create_nfs_client_mount_role
+
+#Step 28
+create_wordpress_install_role
+
+#Step 29
+create_wordpress_config_role
+
+#Step 1X
 create_general_playbook
 
-# Step 26
+# Step 2X
 display_manual_actions_message
