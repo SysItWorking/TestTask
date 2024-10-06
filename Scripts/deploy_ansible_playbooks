@@ -131,6 +131,7 @@ create_directory_structure() {
         "/etc/ansible/roles/firewall/defaults"
         "/etc/ansible/roles/hosts_management/tasks"
         "/etc/ansible/roles/mariadb_install/vars"
+        "/etc/ansible/roles/mariadb_replication/tasks"
     )
 
     local all_created=true  # Flag to track overall success
@@ -674,7 +675,7 @@ EOL
 }
 
 #########################################################################
-# Step 17: Create tasks file for MariaDB installation and replication   #
+# Step 17: Create tasks file for MariaDB installation                  #
 #########################################################################
 
 create_mariadb_tasks_file() {
@@ -710,6 +711,8 @@ create_mariadb_tasks_file() {
     enabled: yes
 
 # Применение шаблона конфигурации для репликации
+
+# Применение шаблона конфигурации для репликации
 - name: Set up my.cnf for replication
   template:
     src: /etc/ansible/roles/mariadb_install/templates/my.cnf.j2
@@ -717,13 +720,14 @@ create_mariadb_tasks_file() {
     owner: mysql
     group: mysql
     mode: '0644'
-  notify: Restart MariaDB
+  register: mariadb_config_updated
 
 # Перезапуск MariaDB после изменения конфигурации
-- name: Restart MariaDB
+- name: Restart MariaDB if configuration changed
   service:
     name: mysql
     state: restarted
+  when: mariadb_config_updated.changed == true
 
 # Создаем пользователя для репликации
 - name: Create replication user
@@ -756,12 +760,6 @@ create_mariadb_tasks_file() {
     state: present
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
-
-# Хендлер для перезапуска MariaDB
-- name: Restart MariaDB
-  service:
-    name: mysql
-    state: restarted
 EOL
         then
             output_status "Create the MariaDB tasks file" "Done" "$GREEN"
@@ -974,6 +972,7 @@ create_general_playbook() {
     - firewall
     - hosts_management
     - mariadb_install
+    - mariadb_replication
 EOL
         then
             output_status "Create the general playbook" "Done" "$GREEN"
