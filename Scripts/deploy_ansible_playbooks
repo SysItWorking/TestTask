@@ -1505,7 +1505,7 @@ create_wordpress_config_role() {
     - { key: 'DB_NAME', value: 'wordpress_db' }
     - { key: 'DB_USER', value: '{{ mariadb_wp_db_user }}' }
     - { key: 'DB_PASSWORD', value: '{{ mariadb_wp_db_password }}' }
-    - { key: 'DB_HOST', value: "{{ hostvars[\"web1\"].ansible_host }}" }
+    - { key: 'DB_HOST', value: "{{ hostvars['web1'].ansible_host }}" }
 
 - name: Set correct permissions on wp-config.php
   file:
