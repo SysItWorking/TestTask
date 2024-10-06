@@ -1136,7 +1136,7 @@ EOL
 #########################################################################
 
 create_nfs_setup_playbook() {
-    local playbook_file="/etc/ansible/roles/nfs_setup/tasks/main.yml"
+    local playbook_file="/etc/ansible/roles/nfs_server_setup/tasks/main.yml"
 
     if [ -f "$playbook_file" ]; then
         # File already exists
