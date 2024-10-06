@@ -338,8 +338,6 @@ create_php_tasks_file() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/php_install/tasks && cat <<EOL > "$php_tasks_file"
 ---
-# /etc/ansible/roles/php_install/tasks/main.yml
-
 # Install gnupg and lsb-release for repository management
 - name: Install gnupg and lsb-release
   apt:
@@ -398,16 +396,12 @@ create_php_tasks_file() {
     dest: "{{ php_fpm_pool_dir }}/{{ user }}.conf"
   notify: restart_php_fpm
 
-# Collect facts about the system (including the status of services)
-- name: Gather system facts
-  ansible.builtin.setup:
-
-# Getting the PHP-FPM service status
-- name: Get PHP-FPM service status
+# Проверка статуса PHP-FPM
+- name: Check if php8.3-fpm is running
   ansible.builtin.systemd:
     name: php8.3-fpm
     state: started
-  register: php_fpm_status
+  register: php_fpm_service_status
 EOL
         then
             output_status "Create the PHP tasks file" "Done" "$GREEN"
@@ -473,19 +467,19 @@ create_php_fpm_handlers_file() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/php_install/handlers && cat <<EOL > "$php_fpm_handlers_file"
 ---
-# Перезапуск PHP-FPM, если он уже запущен
+# Restart PHP-FPM if it is already running
 - name: restart_php_fpm
   ansible.builtin.systemd:
     name: php8.3-fpm
     state: restarted
-  when: "'php8.3-fpm' in ansible_facts.services and ansible_facts.services['php8.3-fpm'].state == 'running'"
+  when: php_fpm_service_status.status == 'running'
 
-# Запуск PHP-FPM, если он не был запущен
+# Starting PHP-FPM if it is not running
 - name: start_php_fpm_if_not_running
   ansible.builtin.systemd:
     name: php8.3-fpm
     state: started
-  when: "'php8.3-fpm' in ansible_facts.services and ansible_facts.services['php8.3-fpm'].state != 'running'"
+  when: php_fpm_service_status.status != 'running'
 EOL
         then
             output_status "Create the PHP-FPM handlers file" "Done" "$GREEN"
