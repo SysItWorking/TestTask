@@ -717,8 +717,6 @@ create_mariadb_tasks_file() {
     enabled: yes
 
 # Применение шаблона конфигурации для репликации
-
-# Применение шаблона конфигурации для репликации
 - name: Set up my.cnf for replication
   template:
     src: /etc/ansible/roles/mariadb_install/templates/my.cnf.j2
@@ -763,6 +761,34 @@ create_mariadb_tasks_file() {
     password: "{{ mariadb_replication_password }}"
     priv: "*.*:REPLICATION SLAVE"
     host: "{{ hostvars['web1'].ansible_host }}"  # IP первого сервера (web1)
+    state: present
+    login_user: root
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+# *** НОВЫЕ ЗАДАЧИ для создания базы данных и пользователя для WordPress ***
+
+- name: Создать базу данных для WordPress
+  mysql_db:
+    name: wordpress_db
+    state: present
+    login_user: root
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Создать пользователя для WordPress
+  mysql_user:
+    name: wp_user
+    password: testtask2024
+    priv: "wordpress_db.*:ALL"
+    host: '%'
+    state: present
+    login_user: root
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Применить привилегии для пользователя WordPress
+  mysql_user:
+    name: wp_user
+    host: '%'
+    priv: "wordpress_db.*:ALL"
     state: present
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
