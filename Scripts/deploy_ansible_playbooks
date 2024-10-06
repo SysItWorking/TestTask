@@ -235,6 +235,18 @@ create_apache_tasks_file() {
     state: present
   notify: check_apache_config
 
+- name: Enable Apache mod_proxy
+  apache2_module:
+    name: proxy
+    state: present
+  notify: check_apache_config
+
+- name: Enable Apache mod_proxy_fcgi
+  apache2_module:
+    name: proxy_fcgi
+    state: present
+  notify: check_apache_config
+
 - name: Disable default Apache site
   command: a2dissite 000-default.conf
   notify: check_apache_config
