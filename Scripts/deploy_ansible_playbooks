@@ -255,16 +255,46 @@ create_apache_tasks_file() {
     state: present
   notify: check_apache_config
 
+# Add task to enable SSL module
+- name: Enable Apache SSL module
+  apache2_module:
+    name: ssl
+    state: present
+  notify: check_apache_config
+
+- name: Overwrite /etc/apache2/ports.conf with the required content
+  copy:
+    dest: /etc/apache2/ports.conf
+    content: |
+      Listen 80
+
+      <IfModule ssl_module>
+          Listen 443
+      </IfModule>
+
+      <IfModule mod_gnutls.c>
+          Listen 443
+      </IfModule>
+  notify: restart_apache
+
+# Disable default Apache site
 - name: Disable default Apache site
   command: a2dissite 000-default.conf
   notify: check_apache_config
 
-# Added task to check Apache service status before triggering handlers
+# Check Apache service status before triggering handlers
 - name: Check Apache service status
   service:
     name: apache2
     state: started
   register: apache_status
+
+# Optionally, reload Apache configuration after changes
+- name: Restart Apache if configuration was changed
+  service:
+    name: apache2
+    state: restarted
+  when: apache_status.state == "started"
 EOL
         then
             output_status "Create the Apache tasks file" "Done" "$GREEN"
