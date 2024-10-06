@@ -1570,7 +1570,7 @@ create_general_playbook() {
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-   - apache_install
+    - apache_install
     - php_install
     - vhost_configuration
     - user_management
