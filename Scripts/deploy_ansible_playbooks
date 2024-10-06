@@ -929,7 +929,7 @@ create_hosts_management_tasks_file() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/hosts_management/tasks && cat <<EOL > "$hosts_management_tasks_file"
 ---
-# Добавление записи в /etc/hosts для каждого хоста
+# Adding an entry to /etc/hosts for each host
 - name: Add hostname for webserver1 and webserver2 in /etc/hosts
   lineinfile:
     dest: /etc/hosts
@@ -947,7 +947,113 @@ EOL
 }
 
 #########################################################################
-# Step 24: Create general playbook for managing all roles               #
+# Step 24: Create tasks file for MariaDB replication                    #
+#########################################################################
+
+create_mariadb_replication_tasks_file() {
+    local mariadb_replication_tasks_file="/etc/ansible/roles/mariadb_replication/tasks/main.yml"
+
+    if [ -f "$mariadb_replication_tasks_file" ]; then
+        # File already exists
+        output_status "Create the MariaDB Replication tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/mariadb_replication/tasks && cat <<EOL > "$mariadb_replication_tasks_file"
+---
+# Stop replication on both servers before setting up the master
+- name: Stop replication on both servers
+  mysql_replication:
+    mode: stopreplica
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  ignore_errors: yes
+
+# Get Master Status on web1
+- name: Get Master Status on web1
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: "SHOW MASTER STATUS;"
+  register: web1_master_status
+  delegate_to: web1
+  ignore_errors: yes
+  changed_when: false
+
+# Get Master Status on web2
+- name: Get Master Status on web2
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: "SHOW MASTER STATUS;"
+  register: web2_master_status
+  delegate_to: web2
+  ignore_errors: yes
+  changed_when: false
+
+# Set replication for web1 (pointing to web2)
+- name: Set replication for web1 (pointing to web2)
+  mysql_replication:
+    mode: changeprimary
+    primary_host: "{{ hostvars['web2'].ansible_host }}"
+    primary_user: "{{ mariadb_replication_user }}"
+    primary_password: "{{ mariadb_replication_password }}"
+    master_log_file: "{{ web2_master_status.query_result[0][0]['File'] }}"
+    master_log_pos: "{{ web2_master_status.query_result[0][0]['Position'] }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  delegate_to: web1
+
+# Set replication for web2 (pointing to web1)
+- name: Set replication for web2 (pointing to web1)
+  mysql_replication:
+    mode: changeprimary
+    primary_host: "{{ hostvars['web1'].ansible_host }}"
+    primary_user: "{{ mariadb_replication_user }}"
+    primary_password: "{{ mariadb_replication_password }}"
+    master_log_file: "{{ web1_master_status.query_result[0][0]['File'] }}"
+    master_log_pos: "{{ web1_master_status.query_result[0][0]['Position'] }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+  delegate_to: web2
+
+# Start replication on web1
+- name: Start replication on web1
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: "START SLAVE;"
+  delegate_to: web1
+
+# Start replication on web2
+- name: Start replication on web2
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: "START SLAVE;"
+  delegate_to: web2
+
+# Check replication status on web1
+- name: Check replication status on web1
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: "SHOW SLAVE STATUS;"
+  register: web1_replication_status
+  delegate_to: web1
+  changed_when: false
+
+# Check replication status on web2
+- name: Check replication status on web2
+  mysql_query:
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    query: "SHOW SLAVE STATUS;"
+  register: web2_replication_status
+  delegate_to: web2
+  changed_when: false
+EOL
+        then
+            output_status "Create the MariaDB Replication tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the MariaDB Replication tasks file" "Error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 25: Create general playbook for managing all roles               #
 #########################################################################
 
 create_general_playbook() {
@@ -1094,5 +1200,8 @@ create_hosts_management_tasks_file
 #Step 24
 create_general_playbook
 
-# Step 25
+#Step 25
+create_mariadb_replication_tasks_file
+
+# Step 26
 display_manual_actions_message
