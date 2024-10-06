@@ -1203,5 +1203,8 @@ create_general_playbook
 #Step 25
 create_mariadb_replication_tasks_file
 
+#Step 25
+create_general_playbook
+
 # Step 26
 display_manual_actions_message
