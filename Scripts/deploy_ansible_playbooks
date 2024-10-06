@@ -132,6 +132,11 @@ create_directory_structure() {
         "/etc/ansible/roles/hosts_management/tasks"
         "/etc/ansible/roles/mariadb_install/vars"
         "/etc/ansible/roles/mariadb_replication/tasks"
+        "/etc/ansible/roles/nfs_server_setup/tasks"
+        "/etc/ansible/roles/nfs_server_setup/defaults"
+        "/etc/ansible/roles/nfs_client_mount/tasks"
+        "/etc/ansible/roles/wordpress_install/tasks"
+        "/etc/ansible/roles/wordpress_config/tasks"
     )
 
     local all_created=true  # Flag to track overall success
