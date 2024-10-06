@@ -397,7 +397,11 @@ create_php_tasks_file() {
     dest: "{{ php_fpm_pool_dir }}/{{ user }}.conf"
   notify: restart_php_fpm
 
-# Get PHP-FPM service status
+# Collect facts about the system (including the status of services)
+- name: Gather system facts
+  ansible.builtin.setup:
+
+# Getting the PHP-FPM service status
 - name: Get PHP-FPM service status
   ansible.builtin.systemd:
     name: php8.3-fpm
