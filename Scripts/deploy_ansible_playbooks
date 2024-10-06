@@ -308,6 +308,12 @@ create_apache_handlers_file() {
     name: apache2
     state: started
   when: apache_status.state != "started"
+
+# Handler for reloading Apache (новый хэндлер)
+- name: reload_apache
+  service:
+    name: apache2
+    state: reloaded
 EOL
         then
             output_status "Create the Apache handlers file" "Done" "$GREEN"
