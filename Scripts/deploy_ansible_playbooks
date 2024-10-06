@@ -1624,7 +1624,7 @@ display_manual_actions_message() {
     echo "${RED}-------------------------------------------------------------------------------------------------${RESET}"
     echo ""
     echo "${YELLOW}Run the Test command to make sure that Ansible may connect to the remote hosts:"
-    echo "ansible all -m ping -i /etc/ansible/hosts"
+    echo "export ANSIBLE_HOST_KEY_CHECKING=False;ansible all -m ping -i /etc/ansible/hosts"
     echo ""
     echo "If all looks fine, please run (where you need to enter the pass from the step above):"
     echo "ansible-playbook /etc/ansible/playbooks/site.yml --ask-vault-pass"
