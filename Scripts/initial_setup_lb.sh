@@ -219,7 +219,7 @@ if [ -f "$DH_FILE" ]; then
 else
     output_status "Generating Diffie-Hellman parameters (this may take a while)" "In Progress" "$GREEN"
 
-    # Запускаем генерацию DH параметров
+    # Start generating DH parameters
     ./easyrsa gen-dh > /dev/null 2>&1
 
     if [ $? -eq 0 ]; then
