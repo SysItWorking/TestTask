@@ -1978,8 +1978,8 @@ create_general_playbook() {
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - nfs_server_setup  # Настройка NFS сервера
-    - wordpress_install  # Установка WordPress
+    - nfs_server_setup
+    - wordpress_install
     - firewall
 
 # WordPress configuration on web1
