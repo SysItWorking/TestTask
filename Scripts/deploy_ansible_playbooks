@@ -140,6 +140,8 @@ create_directory_structure() {
         "/etc/ansible/roles/nfs_client_mount/tasks"
         "/etc/ansible/roles/wordpress_install/tasks"
         "/etc/ansible/roles/wordpress_config/tasks"
+        "etc/ansible/roles/certificate_generation/tasks"
+        "/etc/ansible/roles/certificate_generation/defaults"
     )
 
     local all_created=true  # Flag to track overall success
@@ -1582,6 +1584,91 @@ EOL
 }
 
 #########################################################################
+# Step 30: Create a role for certificate generation with variables      #
+#########################################################################
+
+create_certificate_generation_role() {
+    local defaults_file="/etc/ansible/roles/certificate_generation/defaults/main.yml"
+
+    if [ -f "$defaults_file" ]; then
+        # File already exists
+        output_status "Create the Certificate Generation role" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/certificate_generation/defaults && cat <<EOL > "$defaults_file"
+cert_days: 365
+cert_key_length: 2048
+cert_country: "US"
+cert_state: "Some-State"
+cert_locality: "Some-City"
+cert_organization: "Test Organization"
+cert_organizational_unit: "IT"
+cert_common_name: "{{ server_name }}"
+cert_email: "admin@{{ server_name }}"
+ssl_cert_dir: "/etc/ssl/{{ server_name }}"
+ssl_cert_file: "{{ ssl_cert_dir }}/{{ server_name }}.crt"
+ssl_cert_key_file: "{{ ssl_cert_dir }}/{{ server_name }}.key"
+EOL
+        then
+            output_status "Create the Certificate Generation role" "Done" "$GREEN"
+        else
+            output_status "Create the Certificate Generation role" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 31: Create a role file to describe tasks for certificate generation #
+#########################################################################
+
+create_certificate_generation_tasks_file() {
+    local tasks_file="/etc/ansible/roles/certificate_generation/tasks/main.yml"
+
+    if [ -f "$tasks_file" ]; then
+        # File already exists
+        output_status "Create the Certificate Generation tasks file" "Already created" "$YELLOW"
+    else
+        # Try to create the file with the specified content
+        if mkdir -p /etc/ansible/roles/certificate_generation/tasks && cat <<EOL > "$tasks_file"
+---
+- name: Install OpenSSL for certificate generation
+  apt:
+    name: openssl
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Create directory for SSL certificates
+  file:
+    path: "{{ ssl_cert_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if SSL certificate already exists
+  stat:
+    path: "{{ ssl_cert_file }}"
+  register: cert_stat
+
+- name: Generate a self-signed SSL certificate
+  command: |
+    openssl req -x509 -nodes -days {{ cert_days }} \
+    -newkey rsa:{{ cert_key_length }} -keyout {{ ssl_cert_key_file }} \
+    -out {{ ssl_cert_file }} -subj "/C={{ cert_country }}/ST={{ cert_state }}/L={{ cert_locality }}/O={{ cert_organization }}/OU={{ cert_organizational_unit }}/CN={{ cert_common_name }}/emailAddress={{ cert_email }}"
+  when: not cert_stat.stat.exists
+  notify: reload_apache
+EOL
+        then
+            output_status "Create the Certificate Generation tasks file" "Done" "$GREEN"
+        else
+            output_status "Create the Certificate Generation tasks file" "error" "$RED"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
 # Step 1X: Create general playbook for managing all roles               #
 #########################################################################
 
@@ -1609,6 +1696,7 @@ create_general_playbook() {
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
+    - certificate_generation
     - apache_install
     - php_install
     - vhost_configuration
@@ -1758,6 +1846,12 @@ create_wordpress_install_role
 
 #Step 29
 create_wordpress_config_role
+
+#Step 30
+create_certificate_generation_role
+
+#Step 31
+create_certificate_generation_tasks_file
 
 #Step 1X
 create_general_playbook
