@@ -1012,6 +1012,14 @@ create_firewall_tasks_file() {
     proto: tcp
     from_ip: "{{ firewall_allowed_ip }}"
   become: true
+
+- name: Allow port 80/tcp and udp
+  ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    from_ip: "{{ firewall_allowed_ip }}"
+  become: true
 EOL
         then
             output_status "Create the Firewall tasks file" "Done" "$GREEN"
