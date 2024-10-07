@@ -973,7 +973,7 @@ create_firewall_tasks_file() {
 - name: Open port 3306 for internal network
   ufw:
     rule: allow
-    port: '3306'
+    port: "3306"
     proto: tcp
     from_ip: "{{ firewall_allowed_ip }}"
   become: true
@@ -981,7 +981,7 @@ create_firewall_tasks_file() {
 - name: Allow port 2049/tcp for NFS
   ufw:
     rule: allow
-    port: '2049'
+    port: "2049"
     proto: tcp
     from_ip: "{{ firewall_allowed_ip }}"
   become: true
@@ -989,7 +989,7 @@ create_firewall_tasks_file() {
 - name: Allow port 111/tcp and udp
   ufw:
     rule: allow
-    port: '111'
+    port: "111"
     proto: tcp
     from_ip: "{{ firewall_allowed_ip }}"
   become: true
@@ -997,7 +997,7 @@ create_firewall_tasks_file() {
 - name: Allow port 20048/tcp for NFS
   ufw:
     rule: allow
-    port: '20048'
+    port: "20048"
     proto: tcp
     from_ip: "{{ firewall_allowed_ip }}"
   become: true
@@ -1005,7 +1005,7 @@ create_firewall_tasks_file() {
 - name: Allow port 875/tcp and udp
   ufw:
     rule: allow
-    port: '875'
+    port: "875"
     proto: tcp
     from_ip: "{{ firewall_allowed_ip }}"
   become: true
@@ -1013,17 +1013,17 @@ create_firewall_tasks_file() {
 - name: Allow port 443/tcp and udp
   ufw:
     rule: allow
-    port: '443'
+    port: "443"
     proto: tcp
-    from_ip: "{{ firewall_allowed_ip }}"
+    from_ip: 0.0.0.0/0
   become: true
 
 - name: Allow port 80/tcp and udp
   ufw:
     rule: allow
-    port: '80'
+    port: "80"
     proto: tcp
-    from_ip: "{{ firewall_allowed_ip }}"
+    from_ip: 0.0.0.0/0
   become: true
 EOL
         then
