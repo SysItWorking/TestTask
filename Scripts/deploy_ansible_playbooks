@@ -1530,7 +1530,7 @@ EOL
 #########################################################################
 # Step 29: Create role for WordPress configuration                    #
 #########################################################################
-
+#Version1
 create_wordpress_config_role() {
     local tasks_file="/etc/ansible/roles/wordpress_config/tasks/main.yml"
 
