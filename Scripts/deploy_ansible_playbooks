@@ -692,11 +692,27 @@ create_vhost_template() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/vhost_configuration/templates && cat <<EOL > "$vhost_template"
 <VirtualHost *:80>
-    DocumentRoot "{{ doc_root }}"
     ServerName {{ server_name }}
     ServerAlias www.{{ server_name }}
     ErrorLog "{{ log_dir }}/error.log"
     CustomLog "{{ log_dir }}/access.log" common
+
+    # Redirect all HTTP requests to HTTPS
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    DocumentRoot "{{ doc_root }}"
+    ServerName {{ server_name }}
+    ServerAlias www.{{ server_name }}
+    ErrorLog "{{ log_dir }}/ssl-error.log"
+    CustomLog "{{ log_dir }}/ssl-access.log" common
+
+    SSLEngine on
+    SSLCertificateFile    "{{ ssl_cert_file }}"
+    SSLCertificateKeyFile "{{ ssl_cert_key_file }}"
 
     <Directory "{{ doc_root }}">
         Options -Indexes +FollowSymLinks
@@ -708,7 +724,6 @@ create_vhost_template() {
         SetHandler "proxy:unix:/run/php/php{{ php_version }}-fpm.sock|fcgi://localhost/"
     </FilesMatch>
 
-    # Support for cgi-bin, if needed for non-PHP scripts
     ScriptAlias /cgi-bin/ "{{ cgi_dir }}"
     <Directory "{{ cgi_dir }}">
         AllowOverride None
