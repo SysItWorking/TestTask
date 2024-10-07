@@ -1720,6 +1720,8 @@ create_general_playbook() {
 
 - hosts: web1
   become: true
+  vars_files:
+    - /etc/ansible/vars/secrets.yml
   roles:
     - wordpress_config  # And finally, we set up WordPress on web1
 EOL
