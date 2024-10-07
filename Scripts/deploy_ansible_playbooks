@@ -1936,7 +1936,7 @@ create_haproxy_error_page_400() {
         # Файл уже существует
         echo "HAProxy 400 error page already exists at $error_page_file"
     else
-        # Создаем файл HAProxy 400 error page
+        # Create a HAProxy 400 error page file
         if mkdir -p /etc/ansible/roles/haproxy_install/files/error_pages && cat <<EOL > "$error_page_file"
 HTTP/1.0 400 Bad request
 Content-Type: text/html
