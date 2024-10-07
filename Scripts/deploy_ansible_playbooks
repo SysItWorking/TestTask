@@ -1972,7 +1972,7 @@ create_general_playbook() {
         # Try to create the playbook with the specified content
         if mkdir -p /etc/ansible/playbooks && cat <<EOL > "$playbook_file"
 ---
-# Setting up NFS Server and Installing WordPress
+# Setting up an NFS server and installing WordPress
 - hosts: loadbalancing
   become: true
   vars_files:
@@ -1982,23 +1982,24 @@ create_general_playbook() {
     - wordpress_install  # Установка WordPress
     - firewall
 
-# Mounting NFS Shares on Web Servers
+# WordPress configuration on web1
 - hosts: webservers
   become: true
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - nfs_client_mount  # Монтирование NFS на веб-сервера
     - apache_install
     - php_install
     - vhost_configuration
     - user_management
+    - certificate_generation
     - firewall
     - hosts_management
     - mariadb_install
     - mariadb_replication
+    - nfs_client_mount
 
-# WordPress configuration on web1
+# WordPress configuration on web1 to the NFS Share
 - hosts: web1
   become: true
   vars_files:
@@ -2012,7 +2013,7 @@ create_general_playbook() {
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - haproxy_install 
+    - haproxy_install
 EOL
         then
             output_status "Create the general playbook" "Done" "$GREEN"
