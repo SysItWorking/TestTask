@@ -1533,10 +1533,6 @@ create_wordpress_config_role() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/wordpress_config/tasks && cat <<EOL > "$tasks_file"
 ---
-- name: Load encrypted variables from Ansible Vault
-  include_vars:
-    file: /etc/ansible/vars/secrets.yml
-
 - name: Check if wp-config.php exists
   stat:
     path: /var/www/web/public_html/wp-config.php
