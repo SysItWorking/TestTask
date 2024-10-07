@@ -88,6 +88,32 @@ mkdir -p /etc/openvpn/client/
 touch /etc/openvpn/client/$(uname -n).ovpn
 ln -s /etc/openvpn/client/$(uname -n).ovpn /etc/openvpn/client/client.conf
 
+# Regular system updates
+print_color "Configuring automatic system updates" "yellow"
+
+# Creating script for auto-updates
+cat <<EOF >/usr/local/bin/auto-update.sh
+#!/bin/bash
+apt-get update -qq
+apt-get upgrade -y -qq
+apt-get autoremove -y -qq
+apt-get autoclean -qq
+EOF
+
+# Making the script executable
+chmod +x /usr/local/bin/auto-update.sh
+
+# Adding the script to cron for daily execution at 3 AM
+(crontab -l 2>/dev/null; echo "0 3 * * * /usr/local/bin/auto-update.sh >> /var/log/auto-update.log 2>&1") | crontab -
+
+if [ $? -eq 0 ]; then
+    print_color "Automatic updates configured successfully" "green"
+else
+    print_color "Failed to configure automatic updates" "red"
+fi
+
+print_color "" "none" # Blank line
+
 # Instructions for copying keys and configuration
 print_color "" "none" # Blank line
 print_color "Please copy SSH public key from /home/deploy/.ssh/id_rsa.pub on the LoadBalancing server to /home/deploy/.ssh/authorized_keys" "yellow"
