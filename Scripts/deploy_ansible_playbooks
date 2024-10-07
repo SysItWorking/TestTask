@@ -142,6 +142,11 @@ create_directory_structure() {
         "/etc/ansible/roles/wordpress_config/tasks"
         "etc/ansible/roles/certificate_generation/tasks"
         "/etc/ansible/roles/certificate_generation/defaults"
+        "/etc/ansible/roles/haproxy_install/defaults"
+        "/etc/ansible/roles/haproxy_install/handlers"
+        "/etc/ansible/roles/haproxy_install/tasks"
+        "/etc/ansible/roles/haproxy_install/templates"
+        "/etc/ansible/roles/haproxy_install/files/error_pages"
     )
 
     local all_created=true  # Flag to track overall success
@@ -1685,6 +1690,273 @@ EOL
         fi
     fi
 }
+#########################################################################
+# Step 32: Create a role file to describe variables for HAProxy setup       #
+#########################################################################
+
+create_haproxy_defaults() {
+    local defaults_file="/etc/ansible/roles/haproxy_install/defaults/main.yml"
+
+    if [ -f "$defaults_file" ]; then
+        # Файл уже существует
+        echo "HAProxy defaults already exist at $defaults_file"
+    else
+        # Создаем файл с нужными переменными
+        if mkdir -p /etc/ansible/roles/haproxy_install/defaults && cat <<EOL > "$defaults_file"
+haproxy_frontend_http_port: 80
+haproxy_frontend_https_port: 443
+haproxy_backend_servers:
+  - { name: "web1", address: "172.21.0.3", port: "443" }
+  - { name: "web2", address: "172.21.0.4", port: "443" }
+ssh_port: 7856
+ssh_private_key: /home/deploy/.ssh/id_rsa
+EOL
+        then
+            echo "HAProxy defaults created successfully at $defaults_file"
+        else
+            echo "Failed to create HAProxy defaults"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 33: Create a handler for restarting HAProxy                      #
+#########################################################################
+
+create_haproxy_handler() {
+    local handler_file="/etc/ansible/roles/haproxy_install/handlers/main.yml"
+
+    if [ -f "$handler_file" ]; then
+        # Файл уже существует
+        echo "HAProxy handler already exists at $handler_file"
+    else
+        # Создаем файл с задачей для перезапуска HAProxy
+        if mkdir -p /etc/ansible/roles/haproxy_install/handlers && cat <<EOL > "$handler_file"
+---
+- name: Restart HAProxy
+  service:
+    name: haproxy
+    state: restarted
+EOL
+        then
+            echo "HAProxy handler created successfully at $handler_file"
+        else
+            echo "Failed to create HAProxy handler"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 34: Create tasks for installing and configuring HAProxy          #
+#########################################################################
+
+create_haproxy_tasks() {
+    local tasks_file="/etc/ansible/roles/haproxy_install/tasks/main.yml"
+
+    if [ -f "$tasks_file" ]; then
+        # Файл уже существует
+        echo "HAProxy tasks file already exists at $tasks_file"
+    else
+        # Создаем файл с задачами для установки и настройки HAProxy
+        if mkdir -p /etc/ansible/roles/haproxy_install/tasks && cat <<EOL > "$tasks_file"
+---
+- name: Remove HAProxy and purge its configuration files
+  apt:
+    name: haproxy
+    state: absent
+    purge: yes
+
+- name: Install HAProxy
+  apt:
+    name: haproxy
+    state: present
+    update_cache: yes
+
+- name: Check if HAProxy config exists
+  stat:
+    path: /etc/haproxy/haproxy.cfg
+  register: haproxy_cfg
+
+- name: Backup original HAProxy config if it exists
+  copy:
+    src: /etc/haproxy/haproxy.cfg
+    dest: /etc/haproxy/haproxy.cfg_orig
+    backup: yes
+  when: haproxy_cfg.stat.exists
+
+- name: Ensure necessary directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: haproxy
+    group: haproxy
+    mode: '0755'
+  with_items:
+    - /etc/haproxy
+    - /etc/haproxy/certs
+
+- name: Create HAProxy config from template
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure /etc/ssl/testtask.com exists on web1
+  file:
+    path: /etc/ssl/testtask.com
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+  delegate_to: web1
+
+- name: Check if certificate and key exist on web1
+  stat:
+    path: "/etc/ssl/testtask.com/{{ item }}"
+  register: cert_stat
+  with_items:
+    - testtask.com.crt
+    - testtask.com.key
+  delegate_to: web1
+
+- name: Concatenate certificate and key into PEM on web1
+  shell: cat /etc/ssl/testtask.com/testtask.com.crt /etc/ssl/testtask.com/testtask.com.key > /etc/ssl/testtask.com/testtask.com.pem
+  args:
+    creates: /etc/ssl/testtask.com/testtask.com.pem
+  become: true
+  delegate_to: web1
+  when: cert_stat.results[0].stat.exists and cert_stat.results[1].stat.exists
+
+- name: Copy SSL certificate from web1 to load-balancing using SCP
+  shell: scp -P {{ ssh_port }} -i {{ ssh_private_key }} deploy@{{ item.address }}:/etc/ssl/testtask.com/testtask.com.pem /etc/haproxy/certs/testtask.com.pem
+  args:
+    creates: /etc/haproxy/certs/testtask.com.pem
+  with_items: "{{ haproxy_backend_servers }}"
+  when: item.name == "web1"
+
+- name: Set correct permissions for PEM file
+  file:
+    path: /etc/haproxy/certs/testtask.com.pem
+    owner: haproxy
+    group: haproxy
+    mode: '0600'
+
+- name: Restart HAProxy
+  service:
+    name: haproxy
+    state: restarted
+EOL
+        then
+            echo "HAProxy tasks file created successfully at $tasks_file"
+        else
+            echo "Failed to create HAProxy tasks file"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 35: Create the HAProxy configuration template                    #
+#########################################################################
+
+create_haproxy_template() {
+    local template_file="/etc/ansible/roles/haproxy_install/templates/haproxy.cfg.j2"
+
+    if [ -f "$template_file" ]; then
+        # Файл уже существует
+        echo "HAProxy configuration template already exists at $template_file"
+    else
+        # Создаем файл шаблона HAProxy конфигурации
+        if mkdir -p /etc/ansible/roles/haproxy_install/templates && cat <<EOL > "$template_file"
+global
+    log /dev/log local0 info
+    log /dev/log local1 debug
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log     global
+    option tcplog
+    option  dontlognull
+    timeout connect 5000ms
+    timeout client  50000ms
+    timeout server  50000ms
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
+
+frontend http_front
+    bind *:{{ haproxy_frontend_http_port }}
+    mode http
+    redirect scheme https code 301 if !{ ssl_fc }
+
+frontend https_front
+    bind *:{{ haproxy_frontend_https_port }} ssl crt /etc/haproxy/certs/testtask.com.pem alpn http/1.1 ssl-min-ver TLSv1.2
+    mode tcp
+    default_backend web_servers
+
+backend web_servers
+    mode tcp
+    balance roundrobin
+    option tcp-check
+    {% for server in haproxy_backend_servers %}
+    server {{ server.name }} {{ server.address }}:{{ server.port }} ssl verify none check
+    {% endfor %}
+EOL
+        then
+            echo "HAProxy configuration template created successfully at $template_file"
+        else
+            echo "Failed to create HAProxy configuration template"
+            exit 1
+        fi
+    fi
+}
+
+#########################################################################
+# Step 36: Create the HAProxy custom 400 error page                     #
+#########################################################################
+
+create_haproxy_error_page_400() {
+    local error_page_file="/etc/ansible/roles/haproxy_install/files/error_pages/400.http"
+
+    if [ -f "$error_page_file" ]; then
+        # Файл уже существует
+        echo "HAProxy 400 error page already exists at $error_page_file"
+    else
+        # Создаем файл HAProxy 400 error page
+        if mkdir -p /etc/ansible/roles/haproxy_install/files/error_pages && cat <<EOL > "$error_page_file"
+HTTP/1.0 400 Bad request
+Content-Type: text/html
+
+<html>
+<head><title>400 Bad Request</title></head>
+<body>
+<h1>Bad Request</h1>
+<p>Your browser sent a request that this server could not understand.</p>
+</body>
+</html>
+EOL
+        then
+            echo "HAProxy 400 error page created successfully at $error_page_file"
+        else
+            echo "Failed to create HAProxy 400 error page"
+            exit 1
+        fi
+    fi
+}
 
 #########################################################################
 # Step 1X: Create general playbook for managing all roles               #
@@ -1700,21 +1972,23 @@ create_general_playbook() {
         # Try to create the playbook with the specified content
         if mkdir -p /etc/ansible/playbooks && cat <<EOL > "$playbook_file"
 ---
+# Шаг 1: Настройка NFS сервера и установка WordPress
 - hosts: loadbalancing
   become: true
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - nfs_server_setup  # First, let's set up the NFS server
-    - wordpress_install  # Then we will install WordPress on NFS
+    - nfs_server_setup  # Настройка NFS сервера
+    - wordpress_install  # Установка WordPress
     - firewall
 
+# Шаг 2: Монтирование NFS шары на веб-сервера
 - hosts: webservers
   become: true
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - certificate_generation
+    - nfs_client_mount  # Монтирование NFS на веб-сервера
     - apache_install
     - php_install
     - vhost_configuration
@@ -1723,14 +1997,22 @@ create_general_playbook() {
     - hosts_management
     - mariadb_install
     - mariadb_replication
-    - nfs_client_mount
 
+# Шаг 3: Конфигурация WordPress на web1
 - hosts: web1
   become: true
   vars_files:
     - /etc/ansible/vars/secrets.yml
   roles:
-    - wordpress_config  # And finally, we set up WordPress on web1
+    - wordpress_config  # Настройка WordPress на web1
+
+# Шаг 4: Установка и настройка HAProxy (в конце)
+- hosts: loadbalancing
+  become: true
+  vars_files:
+    - /etc/ansible/vars/secrets.yml
+  roles:
+    - haproxy_install 
 EOL
         then
             output_status "Create the general playbook" "Done" "$GREEN"
@@ -1872,6 +2154,21 @@ create_certificate_generation_role
 
 #Step 31
 create_certificate_generation_tasks_file
+
+# Step 32
+create_haproxy_defaults
+
+# Step 33
+create_haproxy_handler
+
+# Step 34
+create_haproxy_tasks
+
+# Step 35
+create_haproxy_template
+
+# Step 36
+create_haproxy_error_page_400
 
 #Step 1X
 create_general_playbook
