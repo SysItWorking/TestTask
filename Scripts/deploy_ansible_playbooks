@@ -1540,7 +1540,6 @@ create_wordpress_config_role() {
         # Try to create the file with the specified content
         if mkdir -p /etc/ansible/roles/wordpress_config/tasks && cat <<'EOL' > "$tasks_file"
 ---
-#Version1
 - name: Check if wp-config.php exists
   stat:
     path: /var/www/web/public_html/wp-config.php
