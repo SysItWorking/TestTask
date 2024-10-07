@@ -459,7 +459,7 @@ create_php_tasks_file() {
     dest: "{{ php_fpm_pool_dir }}/{{ user }}.conf"
   notify: restart_php_fpm
 
-# Проверка статуса PHP-FPM
+# Checking PHP-FPM Status
 - name: Check if php8.3-fpm is running
   ansible.builtin.systemd:
     name: php8.3-fpm
@@ -782,7 +782,7 @@ create_mariadb_tasks_file() {
     state: started
     enabled: yes
 
-# Применение шаблона конфигурации для репликации
+# Applying a Configuration Template for Replication
 - name: Set up my.cnf for replication
   template:
     src: /etc/ansible/roles/mariadb_install/templates/my.cnf.j2
@@ -792,14 +792,14 @@ create_mariadb_tasks_file() {
     mode: '0644'
   register: mariadb_config_updated
 
-# Перезапуск MariaDB после изменения конфигурации
+# Restarting MariaDB after changing configuration
 - name: Restart MariaDB if configuration changed
   service:
     name: mysql
     state: restarted
   when: mariadb_config_updated.changed == true
 
-# Создаем пользователя для репликации
+# Create a user for replication
 - name: Create replication user
   mysql_user:
     name: "{{ mariadb_replication_user }}"
@@ -809,7 +809,7 @@ create_mariadb_tasks_file() {
     state: present
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-# Создаем пользователя для репликации на web1 с доступом с IP web2
+# Create a user for replication on web1 with access from IP web2
 - name: Create replication user for web2 on web1
   mysql_user:
     name: "{{ mariadb_replication_user }}"
@@ -820,7 +820,7 @@ create_mariadb_tasks_file() {
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-# Создаем пользователя для репликации на web2 с доступом с IP web1
+# Create a user for replication on web2 with access from IP web1
 - name: Create replication user for web1 on web2
   mysql_user:
     name: "{{ mariadb_replication_user }}"
@@ -831,16 +831,16 @@ create_mariadb_tasks_file() {
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-# *** НОВЫЕ ЗАДАЧИ для создания базы данных и пользователя для WordPress ***
+# Task for creating database and user for WordPress
 
-- name: Создать базу данных для WordPress
+- name: Create a Database for WordPress
   mysql_db:
     name: wordpress_db
     state: present
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-- name: Создать пользователя для WordPress
+- name: Create a user for WordPress
   mysql_user:
     name: wp_user
     password: testtask2024
@@ -850,7 +850,7 @@ create_mariadb_tasks_file() {
     login_user: root
     login_unix_socket: /var/run/mysqld/mysqld.sock
 
-- name: Применить привилегии для пользователя WordPress
+- name: Apply Privileges to WordPress User
   mysql_user:
     name: wp_user
     host: '%'
@@ -887,7 +887,7 @@ log_bin = {{ ansible_hostname }}-bin.log
 relay-log = {{ ansible_hostname }}-relay-bin.log
 auto-increment-increment = 2
 auto-increment-offset = {{ mariadb_server_id }}
-binlog_do_db = {{ mariadb_wp_db_name }}  # Реплицируемая база данных
+binlog_do_db = {{ mariadb_wp_db_name }} 
 log_slave_updates = 1
 skip_slave_start = 1
 skip-name-resolve
@@ -1698,10 +1698,10 @@ create_haproxy_defaults() {
     local defaults_file="/etc/ansible/roles/haproxy_install/defaults/main.yml"
 
     if [ -f "$defaults_file" ]; then
-        # Файл уже существует
+        # The file already exists
         echo "HAProxy defaults already exist at $defaults_file"
     else
-        # Создаем файл с нужными переменными
+        # Create a file with the required variables
         if mkdir -p /etc/ansible/roles/haproxy_install/defaults && cat <<EOL > "$defaults_file"
 haproxy_frontend_http_port: 80
 haproxy_frontend_https_port: 443
@@ -1728,7 +1728,7 @@ create_haproxy_handler() {
     local handler_file="/etc/ansible/roles/haproxy_install/handlers/main.yml"
 
     if [ -f "$handler_file" ]; then
-        # Файл уже существует
+        # The file already exists
         echo "HAProxy handler already exists at $handler_file"
     else
         # Создаем файл с задачей для перезапуска HAProxy
@@ -1756,10 +1756,10 @@ create_haproxy_tasks() {
     local tasks_file="/etc/ansible/roles/haproxy_install/tasks/main.yml"
 
     if [ -f "$tasks_file" ]; then
-        # Файл уже существует
+        # The file already exists
         echo "HAProxy tasks file already exists at $tasks_file"
     else
-        # Создаем файл с задачами для установки и настройки HAProxy
+        # Create a file with tasks for installing and configuring HAProxy
         if mkdir -p /etc/ansible/roles/haproxy_install/tasks && cat <<EOL > "$tasks_file"
 ---
 - name: Remove HAProxy and purge its configuration files
@@ -1868,10 +1868,10 @@ create_haproxy_template() {
     local template_file="/etc/ansible/roles/haproxy_install/templates/haproxy.cfg.j2"
 
     if [ -f "$template_file" ]; then
-        # Файл уже существует
+        # The file already exists
         echo "HAProxy configuration template already exists at $template_file"
     else
-        # Создаем файл шаблона HAProxy конфигурации
+        # Create a HAProxy configuration template file
         if mkdir -p /etc/ansible/roles/haproxy_install/templates && cat <<EOL > "$template_file"
 global
     log /dev/log local0 info
@@ -1972,7 +1972,7 @@ create_general_playbook() {
         # Try to create the playbook with the specified content
         if mkdir -p /etc/ansible/playbooks && cat <<EOL > "$playbook_file"
 ---
-# Шаг 1: Настройка NFS сервера и установка WordPress
+# Setting up NFS Server and Installing WordPress
 - hosts: loadbalancing
   become: true
   vars_files:
@@ -1982,7 +1982,7 @@ create_general_playbook() {
     - wordpress_install  # Установка WordPress
     - firewall
 
-# Шаг 2: Монтирование NFS шары на веб-сервера
+# Mounting NFS Shares on Web Servers
 - hosts: webservers
   become: true
   vars_files:
@@ -1998,7 +1998,7 @@ create_general_playbook() {
     - mariadb_install
     - mariadb_replication
 
-# Шаг 3: Конфигурация WordPress на web1
+# WordPress configuration on web1
 - hosts: web1
   become: true
   vars_files:
@@ -2006,7 +2006,7 @@ create_general_playbook() {
   roles:
     - wordpress_config  # Настройка WordPress на web1
 
-# Шаг 4: Установка и настройка HAProxy (в конце)
+# Installing and Configuring HAProxy
 - hosts: loadbalancing
   become: true
   vars_files:
