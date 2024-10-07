@@ -1539,7 +1539,7 @@ create_wordpress_config_role() {
         output_status "Create the WordPress Config role" "Already created" "$YELLOW"
     else
         # Try to create the file with the specified content
-        if mkdir -p /etc/ansible/roles/wordpress_config/tasks && cat <<EOL > "$tasks_file"
+        if mkdir -p /etc/ansible/roles/wordpress_config/tasks && cat <<'EOL' > "$tasks_file"
 ---
 - name: Check if wp-config.php exists
   stat:
